@@ -1,0 +1,83 @@
+[gd_scene format=3 uid="uid://oy65fknx3h4u"]
+
+[ext_resource type="Script" uid="uid://y0c2x0xqymkj" path="res://Scripts/Player.gd" id="1_player_script"]
+[ext_resource type="Script" uid="uid://doyp270xvbwq0" path="res://Scripts/CameraController.gd" id="2_camera_controller"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_player"]
+radius = 0.35
+height = 1.7
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_player"]
+radius = 0.35
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_hurtbox"]
+height = 1.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_forward_marker"]
+albedo_color = Color(1, 0.15, 0.1, 1)
+emission_enabled = true
+emission = Color(1, 0.15, 0.1, 1)
+emission_energy_multiplier = 0.8
+
+[sub_resource type="BoxMesh" id="BoxMesh_forward_marker"]
+size = Vector3(0.15, 0.15, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_player_blade"]
+albedo_color = Color(0.78, 0.78, 0.83, 1)
+metallic = 0.45
+roughness = 0.22
+
+[sub_resource type="BoxMesh" id="BoxMesh_player_blade"]
+size = Vector3(0.08, 1.05, 0.15)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_player_hitbox"]
+size = Vector3(0.22, 1.18, 0.26)
+
+[node name="Player" type="CharacterBody3D" unique_id=130016083]
+script = ExtResource("1_player_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=108650960]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
+shape = SubResource("CapsuleShape3D_player")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1065389985]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
+mesh = SubResource("CapsuleMesh_player")
+
+[node name="Hurtbox" type="Area3D" parent="." unique_id=1218392421]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Hurtbox" unique_id=1123785562]
+shape = SubResource("CapsuleShape3D_hurtbox")
+
+[node name="ForwardMarker" type="MeshInstance3D" parent="." unique_id=130016084]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4704295, -0.5)
+material_override = SubResource("StandardMaterial3D_forward_marker")
+mesh = SubResource("BoxMesh_forward_marker")
+
+[node name="SwordPivot" type="Node3D" parent="." unique_id=673954463]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.24, 1, -0.02)
+
+[node name="BladeMarker" type="MeshInstance3D" parent="SwordPivot" unique_id=1624906327]
+transform = Transform3D(1, 0, 0, 0, 0.57357645, 0.81915206, 0, -0.81915206, 0.57357645, 0.16, 0.42, -0.22)
+material_override = SubResource("StandardMaterial3D_player_blade")
+mesh = SubResource("BoxMesh_player_blade")
+
+[node name="SwordHitbox" type="Area3D" parent="SwordPivot" unique_id=760120582]
+monitoring = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SwordPivot/SwordHitbox" unique_id=1979775719]
+transform = Transform3D(1, 0, 0, 0, 0.57357645, 0.81915206, 0, -0.81915206, 0.57357645, 0.16, 0.42, -0.22)
+shape = SubResource("BoxShape3D_player_hitbox")
+
+[node name="CameraRig" type="Node3D" parent="." unique_id=2103334612]
+script = ExtResource("2_camera_controller")
+
+[node name="YawPivot" type="Node3D" parent="CameraRig" unique_id=1867712803]
+
+[node name="PitchPivot" type="Node3D" parent="CameraRig/YawPivot" unique_id=861246588]
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig/YawPivot/PitchPivot" unique_id=1290069902]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.85, 0.35, 4.4)
+current = true
+fov = 54.0

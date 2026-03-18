@@ -1,0 +1,24 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="BoxMesh" id="BoxMesh_ground"]
+size = Vector3(30, 1, 30)
+
+[sub_resource type="Shader" id="Shader_ground_checker"]
+code = "shader_type spatial;\n\nrender_mode cull_back, diffuse_burley, specular_schlick_ggx;\n\nuniform vec4 dark_color : source_color = vec4(0.14, 0.14, 0.14, 1.0);\nuniform vec4 light_color : source_color = vec4(0.82, 0.82, 0.78, 1.0);\nuniform float checker_scale = 12.0;\nuniform float roughness_value : hint_range(0.0, 1.0) = 0.92;\n\nvoid fragment() {\n\tvec2 grid = floor(UV * checker_scale);\n\tfloat checker = mod(grid.x + grid.y, 2.0);\n\tvec3 base_color = mix(dark_color.rgb, light_color.rgb, checker);\n\tALBEDO = base_color;\n\tROUGHNESS = roughness_value;\n\tSPECULAR = 0.08;\n}\n"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ground_checker"]
+shader = SubResource("Shader_ground_checker")
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ground"]
+size = Vector3(30, 1, 30)
+
+[node name="Ground" type="StaticBody3D"]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("ShaderMaterial_ground_checker")
+mesh = SubResource("BoxMesh_ground")
+position = Vector3(0, -0.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_ground")
+position = Vector3(0, -0.5, 0)
