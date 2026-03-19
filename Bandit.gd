@@ -63,7 +63,7 @@ var gandr_bind_remaining := 0.0
 var can_see_player := false
 var has_last_known_player_position := false
 var last_known_player_position := Vector3.ZERO
-var health := 90.0
+var health := 0.0
 var player_target: CharacterBody3D
 var health_bar_fill: ColorRect
 var health_bar_sprite: Sprite3D
