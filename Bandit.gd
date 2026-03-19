@@ -29,7 +29,7 @@ enum AwarenessState {
 @export var attack_windup := 0.18
 @export var attack_active_time := 0.22
 @export var attack_recovery := 0.22
-@export var max_health := 45.0
+@export var max_health := 90.0
 @export var sword_rest_rotation := Vector3(-8.0, -18.0, -38.0)
 @export var sword_windup_rotation := Vector3(-6.0, -78.0, -96.0)
 @export var sword_follow_through_rotation := Vector3(-6.0, 78.0, 96.0)
@@ -63,7 +63,7 @@ var gandr_bind_remaining := 0.0
 var can_see_player := false
 var has_last_known_player_position := false
 var last_known_player_position := Vector3.ZERO
-var health := 45.0
+var health := 90.0
 var player_target: CharacterBody3D
 var health_bar_fill: ColorRect
 var health_bar_sprite: Sprite3D
