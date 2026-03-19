@@ -29,6 +29,8 @@ enum AwarenessState {
 @export var attack_windup := 0.18
 @export var attack_active_time := 0.22
 @export var attack_recovery := 0.22
+@export_range(1, 8, 1) var attack_hitbox_sweep_samples := 4
+@export var attack_hitbox_query_margin := 0.08
 @export var max_health := 45.0
 @export var sword_rest_rotation := Vector3(-8.0, -18.0, -38.0)
 @export var sword_windup_rotation := Vector3(-6.0, -78.0, -96.0)
@@ -56,6 +58,7 @@ var hit_reaction_remaining := 0.0
 var block_reaction_remaining := 0.0
 var hit_reaction_side := 1.0
 var block_reaction_side := 1.0
+var previous_attack_hitbox_transform := Transform3D.IDENTITY
 var awareness_state := AwarenessState.IDLE
 var suspicion := 0.0
 var search_time_remaining := 0.0
@@ -80,6 +83,7 @@ func _ready() -> void:
 	player_target = get_tree().get_first_node_in_group("player") as CharacterBody3D
 	sword_hitbox.monitoring = false
 	sword_pivot.rotation_degrees = sword_rest_rotation
+	previous_attack_hitbox_transform = sword_hitbox_shape_node.global_transform
 	_setup_health_bar()
 	_update_health_bar()
 	_update_awareness_visuals()
@@ -368,6 +372,7 @@ func _try_attack() -> void:
 	hit_targets.clear()
 	_set_attack_hitbox_enabled(false)
 	sword_pivot.rotation_degrees = sword_rest_rotation
+	previous_attack_hitbox_transform = sword_hitbox_shape_node.global_transform
 
 
 func _update_attack(delta: float) -> void:
@@ -416,10 +421,14 @@ func _update_attack(delta: float) -> void:
 
 func _set_attack_hitbox_enabled(is_enabled: bool) -> void:
 	if attack_hitbox_active == is_enabled:
+		if not is_enabled:
+			previous_attack_hitbox_transform = sword_hitbox_shape_node.global_transform
 		return
 
 	attack_hitbox_active = is_enabled
 	sword_hitbox.monitoring = is_enabled
+	if not is_enabled:
+		previous_attack_hitbox_transform = sword_hitbox_shape_node.global_transform
 
 
 func _update_feedback_state(delta: float) -> void:
@@ -470,11 +479,25 @@ func _intersect_sword_hitbox() -> Array[Dictionary]:
 	if hitbox_shape == null:
 		return []
 
+	var current_transform := sword_hitbox_shape_node.global_transform
+	var hit_results: Array[Dictionary] = []
+	var sample_count := maxi(attack_hitbox_sweep_samples, 1)
+	for sample_index: int in range(sample_count + 1):
+		var alpha := float(sample_index) / float(sample_count)
+		var sampled_transform := previous_attack_hitbox_transform.interpolate_with(current_transform, alpha)
+		hit_results.append_array(_intersect_sword_hitbox_at_transform(hitbox_shape, sampled_transform))
+
+	previous_attack_hitbox_transform = current_transform
+	return hit_results
+
+
+func _intersect_sword_hitbox_at_transform(hitbox_shape: Shape3D, hitbox_transform: Transform3D) -> Array[Dictionary]:
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = hitbox_shape
-	query.transform = sword_hitbox_shape_node.global_transform
+	query.transform = hitbox_transform
 	query.collide_with_areas = true
 	query.collide_with_bodies = false
+	query.margin = attack_hitbox_query_margin
 	query.exclude = [get_rid(), sword_hitbox.get_rid()]
 	return get_world_3d().direct_space_state.intersect_shape(query)
 
@@ -604,3 +627,9 @@ func get_heartbeat_detail() -> String:
 
 func is_player_hostile() -> bool:
 	return awareness_state >= AwarenessState.ALERTED
+
+
+func is_attacking_player() -> bool:
+	if awareness_state != AwarenessState.ENGAGED:
+		return false
+	return is_attacking or chase_resume_delay_remaining > 0.0 or attack_cooldown_remaining > 0.0

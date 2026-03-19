@@ -35,7 +35,7 @@ roughness = 0.25
 size = Vector3(0.08, 1.2, 0.16)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_bandit_hitbox"]
-size = Vector3(0.24, 1.38, 0.34)
+size = Vector3(0.36, 1.46, 0.48)
 
 [node name="Bandit" type="CharacterBody3D" unique_id=515753734]
 script = ExtResource("1_bandit_script")

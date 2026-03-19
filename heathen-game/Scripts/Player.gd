@@ -28,6 +28,7 @@ signal stealth_feedback_changed(reading_label, reading_detail, pulse_strength)
 @export var blocked_damage_multiplier := 0.2
 @export var block_move_speed_multiplier := 0.55
 @export var combat_move_speed := 3.35
+@export var combat_lock_distance := 10.0
 @export var combat_enter_range := 3.2
 @export var combat_exit_range := 4.8
 @export var focus_mode_steel_linger := 0.95
@@ -40,6 +41,8 @@ signal stealth_feedback_changed(reading_label, reading_detail, pulse_strength)
 @export var spell_cast_cooldown := 0.7
 @export var hrafn_dash_speed := 12.5
 @export var hrafn_phase_duration := 0.18
+@export var hrafn_target_range := 10.0
+@export var hrafn_reform_distance := 1.2
 @export var hugr_pulse_duration := 6.5
 @export var hugr_scan_range := 28.0
 @export var gandr_range := 10.5
@@ -49,6 +52,8 @@ signal stealth_feedback_changed(reading_label, reading_detail, pulse_strength)
 @export var attack_windup := 0.14
 @export var attack_active_time := 0.14
 @export var attack_recovery := 0.24
+@export_range(1, 8, 1) var attack_hitbox_sweep_samples := 4
+@export var attack_hitbox_query_margin := 0.08
 @export var sword_rest_rotation := Vector3(-8.0, -18.0, -38.0)
 @export var sword_windup_rotation := Vector3(-6.0, -78.0, -96.0)
 @export var sword_follow_through_rotation := Vector3(-6.0, 78.0, 96.0)
@@ -97,6 +102,8 @@ var hit_targets: Array[Node] = []
 var dodge_direction := Vector3.ZERO
 var hrafn_phase_remaining := 0.0
 var hrafn_reform_snap_pending := false
+var hrafn_reform_position := Vector3.ZERO
+var hrafn_reform_yaw := NAN
 var hugr_pulse_remaining := 0.0
 var blocked_attack_recoil_remaining := 0.0
 var blocked_attack_recoil_from := Vector3.ZERO
@@ -110,6 +117,7 @@ var standing_collision_position := Vector3.ZERO
 var standing_collision_position_y := 0.0
 var standing_mesh_position_y := 0.0
 var standing_marker_position_y := 0.0
+var previous_attack_hitbox_transform := Transform3D.IDENTITY
 var combat_target: Node3D
 var stealth_feedback_label := "Stillness"
 var stealth_feedback_detail := "No hostile pulse nearby."
@@ -139,6 +147,7 @@ func _ready() -> void:
 	standing_marker_position_y = forward_marker_node.position.y
 	sword_hitbox.monitoring = false
 	sword_pivot.rotation_degrees = sword_rest_rotation
+	previous_attack_hitbox_transform = sword_hitbox_shape_node.global_transform
 	health_changed.emit(health, max_health)
 	stealth_feedback_changed.emit(stealth_feedback_label, stealth_feedback_detail, stealth_feedback_strength)
 	_emit_spell_selection_changed()
@@ -213,8 +222,6 @@ func _physics_process(delta: float) -> void:
 		_start_attack()
 
 	is_blocking = Input.is_action_pressed("block") and not is_attacking and not is_crouching and not is_dodging and not spell_wheel_open
-	if is_blocking:
-		_refresh_focus_mode(focus_mode_steel_linger)
 
 	_update_combat_mode()
 	move_direction = _get_move_direction(input_vector)
@@ -245,7 +252,7 @@ func _physics_process(delta: float) -> void:
 		facing_direction = dodge_direction
 
 	if not spell_wheel_open and is_in_combat_mode:
-		_rotate_toward_focus_forward(delta)
+		_rotate_toward_combat_target()
 	elif not spell_wheel_open and facing_direction != Vector3.ZERO:
 		var target_yaw := Vector3.FORWARD.signed_angle_to(facing_direction, Vector3.UP)
 		rotation.y = lerp_angle(rotation.y, target_yaw, 1.0 - exp(-rotation_speed * delta))
@@ -322,8 +329,8 @@ func _get_capsule_top(center_y: float, capsule_height: float, capsule_radius: fl
 
 
 func _update_combat_mode() -> void:
-	var next_target := _find_closest_enemy(maxf(combat_enter_range, combat_exit_range))
-	_set_combat_mode(_wants_focus_mode(), next_target)
+	var next_target := _find_closest_combat_target(combat_lock_distance)
+	_set_combat_mode(next_target != null, next_target)
 
 
 func _set_combat_mode(next_mode: bool, next_target: Node3D) -> void:
@@ -331,10 +338,13 @@ func _set_combat_mode(next_mode: bool, next_target: Node3D) -> void:
 	if not target_changed and is_in_combat_mode == next_mode:
 		return
 
+	var was_in_combat_mode := is_in_combat_mode
 	is_in_combat_mode = next_mode
 	combat_target = next_target
 	if not is_in_combat_mode:
 		combat_target = null
+	elif not was_in_combat_mode:
+		_snap_to_combat_target()
 
 	if camera_rig != null and camera_rig.has_method("set_combat_mode"):
 		camera_rig.set_combat_mode(is_in_combat_mode)
@@ -342,22 +352,35 @@ func _set_combat_mode(next_mode: bool, next_target: Node3D) -> void:
 	combat_mode_changed.emit(is_in_combat_mode)
 
 
-func _wants_focus_mode() -> bool:
-	if is_dead:
-		return false
-	if spell_input_held or spell_wheel_open or is_attacking or is_blocking:
-		return true
-	if is_dodging and (hrafn_phase_remaining > 0.0 or hrafn_reform_snap_pending):
-		return true
-	if blocked_attack_recoil_remaining > 0.0:
-		return true
-	return focus_mode_remaining > 0.0
-
-
 func _refresh_focus_mode(duration: float) -> void:
 	if duration <= 0.0:
 		return
 	focus_mode_remaining = maxf(focus_mode_remaining, duration)
+
+
+func _find_closest_combat_target(max_distance: float) -> Node3D:
+	var closest_enemy: Node3D
+	var closest_distance := max_distance
+	for enemy: Node in get_tree().get_nodes_in_group("enemy"):
+		if enemy == null or not is_instance_valid(enemy):
+			continue
+		var enemy_node := enemy as Node3D
+		if enemy_node == null:
+			continue
+		if enemy.has_method("is_player_hostile") and not enemy.is_player_hostile():
+			continue
+		if enemy.has_method("is_attacking_player") and not enemy.is_attacking_player():
+			continue
+
+		var planar_offset := enemy_node.global_position - global_position
+		planar_offset.y = 0.0
+		var enemy_distance := planar_offset.length()
+		if enemy_distance > closest_distance:
+			continue
+		closest_distance = enemy_distance
+		closest_enemy = enemy_node
+
+	return closest_enemy
 
 
 func _find_closest_enemy(max_distance: float) -> Node3D:
@@ -386,6 +409,9 @@ func _get_move_direction(input_vector: Vector2) -> Vector3:
 	if input_vector == Vector2.ZERO:
 		return Vector3.ZERO
 
+	if is_in_combat_mode:
+		return (global_basis.x * input_vector.x + global_basis.z * input_vector.y).normalized()
+
 	if camera_rig != null and camera_rig.has_method("get_camera_planar_basis"):
 		var camera_basis: Basis = camera_rig.get_camera_planar_basis()
 		return (camera_basis.x * input_vector.x + camera_basis.z * input_vector.y).normalized()
@@ -393,17 +419,25 @@ func _get_move_direction(input_vector: Vector2) -> Vector3:
 	return Vector3.ZERO
 
 
-func _rotate_toward_focus_forward(delta: float) -> void:
-	var focus_forward := -global_basis.z
-	if camera_rig != null and camera_rig.has_method("get_camera_planar_basis"):
-		var camera_basis: Basis = camera_rig.get_camera_planar_basis()
-		focus_forward = -camera_basis.z
-	focus_forward.y = 0.0
-	if focus_forward.length_squared() <= 0.0001:
+func _rotate_toward_combat_target() -> void:
+	var target_yaw := _get_combat_target_yaw()
+	if is_nan(target_yaw):
 		return
+	rotation.y = target_yaw
 
-	var target_yaw := Vector3.FORWARD.signed_angle_to(focus_forward.normalized(), Vector3.UP)
-	rotation.y = lerp_angle(rotation.y, target_yaw, 1.0 - exp(-rotation_speed * delta))
+
+func _snap_to_combat_target() -> void:
+	_rotate_toward_combat_target()
+
+
+func _get_combat_target_yaw() -> float:
+	if combat_target == null or not is_instance_valid(combat_target):
+		return NAN
+	var target_offset := combat_target.global_position - global_position
+	target_offset.y = 0.0
+	if target_offset.length_squared() <= 0.0001:
+		return NAN
+	return Vector3.FORWARD.signed_angle_to(target_offset.normalized(), Vector3.UP)
 
 
 func get_spell_names() -> Array[String]:
@@ -698,13 +732,25 @@ func _can_cast_spell() -> bool:
 
 
 func _cast_hrafn() -> Dictionary:
-	var surge_direction := _get_spell_direction()
+	var hrafn_target := _find_hrafn_target()
+	if hrafn_target == null:
+		return {"success": false, "text": "Hrafn finds no hostile body close enough to pass through."}
+
+	var reform_position := _get_hrafn_reform_position(hrafn_target)
+	var reform_offset := reform_position - global_position
+	reform_offset.y = 0.0
+	var surge_direction := reform_offset.normalized()
+	if reform_offset.length_squared() <= 0.0001:
+		surge_direction = _get_node_forward(hrafn_target)
 	is_dodging = true
 	is_blocking = false
 	attack_phase_time_remaining = 0.0
 	hit_targets.clear()
 	_set_attack_hitbox_enabled(false)
 	sword_pivot.rotation_degrees = sword_rest_rotation
+	previous_attack_hitbox_transform = sword_hitbox_shape_node.global_transform
+	hrafn_reform_position = reform_position
+	hrafn_reform_yaw = _get_yaw_for_forward(_get_node_forward(hrafn_target))
 	dodge_direction = surge_direction
 	dodge_time_remaining = hrafn_phase_duration
 	hrafn_phase_remaining = hrafn_phase_duration
@@ -712,7 +758,7 @@ func _cast_hrafn() -> Dictionary:
 	damage_invulnerability_remaining = maxf(damage_invulnerability_remaining, hrafn_phase_duration + 0.12)
 	velocity.x = dodge_direction.x * hrafn_dash_speed
 	velocity.z = dodge_direction.z * hrafn_dash_speed
-	return {"success": true, "text": "Hrafn tears you through the gap."}
+	return {"success": true, "text": "Hrafn passes you through the foe and leaves you on their blind side."}
 
 
 func _cast_hugr() -> Dictionary:
@@ -761,15 +807,41 @@ func _get_spell_direction() -> Vector3:
 
 func _apply_hrafn_reform_snap() -> void:
 	hrafn_reform_snap_pending = false
-	var camera_forward := -global_basis.z
-	if camera_rig != null and camera_rig.has_method("get_camera_planar_basis"):
-		var camera_basis: Basis = camera_rig.get_camera_planar_basis()
-		camera_forward = -camera_basis.z
-	camera_forward.y = 0.0
-	if camera_forward.length_squared() <= 0.0001:
-		return
+	global_position = hrafn_reform_position
+	if not is_nan(hrafn_reform_yaw):
+		rotation.y = hrafn_reform_yaw
+	hrafn_reform_position = global_position
+	hrafn_reform_yaw = NAN
 
-	rotation.y = Vector3.FORWARD.signed_angle_to(camera_forward.normalized(), Vector3.UP)
+
+func _find_hrafn_target() -> Node3D:
+	if combat_target != null and is_instance_valid(combat_target):
+		var target_offset := combat_target.global_position - global_position
+		target_offset.y = 0.0
+		if target_offset.length() <= hrafn_target_range:
+			return combat_target
+	return _find_closest_enemy_in_range(hrafn_target_range)
+
+
+func _get_hrafn_reform_position(target_enemy: Node3D) -> Vector3:
+	var enemy_forward := _get_node_forward(target_enemy)
+	var reform_position := target_enemy.global_position - enemy_forward * hrafn_reform_distance
+	reform_position.y = global_position.y
+	return reform_position
+
+
+func _get_node_forward(target_node: Node3D) -> Vector3:
+	var forward := -target_node.global_basis.z
+	forward.y = 0.0
+	if forward.length_squared() <= 0.0001:
+		return Vector3.FORWARD
+	return forward.normalized()
+
+
+func _get_yaw_for_forward(forward: Vector3) -> float:
+	if forward.length_squared() <= 0.0001:
+		return rotation.y
+	return Vector3.FORWARD.signed_angle_to(forward.normalized(), Vector3.UP)
 
 
 func _find_closest_enemy_in_range(max_distance: float) -> Node3D:
@@ -780,6 +852,8 @@ func _find_closest_enemy_in_range(max_distance: float) -> Node3D:
 			continue
 		var enemy_node := enemy as Node3D
 		if enemy_node == null:
+			continue
+		if enemy.has_method("is_player_hostile") and not enemy.is_player_hostile():
 			continue
 		var planar_offset := enemy_node.global_position - global_position
 		planar_offset.y = 0.0
@@ -823,6 +897,7 @@ func _start_dodge(move_direction: Vector3) -> void:
 	damage_invulnerability_remaining = maxf(damage_invulnerability_remaining, dodge_invulnerability_time)
 	hrafn_phase_remaining = 0.0
 	hrafn_reform_snap_pending = false
+	hrafn_reform_yaw = NAN
 
 	if move_direction == Vector3.ZERO:
 		dodge_direction = -global_basis.z
@@ -844,6 +919,7 @@ func _update_combat_state(delta: float) -> void:
 		is_dodging = false
 		_set_combat_mode(false, null)
 		blocked_attack_recoil_remaining = 0.0
+		hrafn_reform_yaw = NAN
 		_set_attack_hitbox_enabled(false)
 		sword_pivot.rotation_degrees = sword_rest_rotation
 		return
@@ -903,10 +979,14 @@ func _update_combat_state(delta: float) -> void:
 
 func _set_attack_hitbox_enabled(is_enabled: bool) -> void:
 	if attack_hitbox_active == is_enabled:
+		if not is_enabled:
+			previous_attack_hitbox_transform = sword_hitbox_shape_node.global_transform
 		return
 
 	attack_hitbox_active = is_enabled
 	sword_hitbox.monitoring = is_enabled
+	if not is_enabled:
+		previous_attack_hitbox_transform = sword_hitbox_shape_node.global_transform
 
 
 func _update_feedback_state(delta: float) -> void:
@@ -958,11 +1038,25 @@ func _intersect_sword_hitbox() -> Array[Dictionary]:
 	if hitbox_shape == null:
 		return []
 
+	var current_transform := sword_hitbox_shape_node.global_transform
+	var hit_results: Array[Dictionary] = []
+	var sample_count := maxi(attack_hitbox_sweep_samples, 1)
+	for sample_index: int in range(sample_count + 1):
+		var alpha := float(sample_index) / float(sample_count)
+		var sampled_transform := previous_attack_hitbox_transform.interpolate_with(current_transform, alpha)
+		hit_results.append_array(_intersect_sword_hitbox_at_transform(hitbox_shape, sampled_transform))
+
+	previous_attack_hitbox_transform = current_transform
+	return hit_results
+
+
+func _intersect_sword_hitbox_at_transform(hitbox_shape: Shape3D, hitbox_transform: Transform3D) -> Array[Dictionary]:
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = hitbox_shape
-	query.transform = sword_hitbox_shape_node.global_transform
+	query.transform = hitbox_transform
 	query.collide_with_areas = true
 	query.collide_with_bodies = false
+	query.margin = attack_hitbox_query_margin
 	query.exclude = [get_rid(), sword_hitbox.get_rid()]
 	return get_world_3d().direct_space_state.intersect_shape(query)
 
@@ -1063,6 +1157,7 @@ func _die() -> void:
 	focus_mode_remaining = 0.0
 	hrafn_phase_remaining = 0.0
 	hrafn_reform_snap_pending = false
+	hrafn_reform_yaw = NAN
 	hugr_pulse_remaining = 0.0
 	hit_reaction_remaining = 0.0
 	block_reaction_remaining = 0.0
