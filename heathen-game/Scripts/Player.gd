@@ -3,8 +3,9 @@ extends CharacterBody3D
 signal health_changed(current_health: float, maximum_health: float)
 signal died
 signal spell_wheel_toggled(is_visible)
-signal spell_selection_changed(spell_names, spell_descriptions, selected_index)
+signal spell_selection_changed(spell_names, spell_descriptions, spell_charges, selected_index)
 signal spell_cast(spell_name, cast_text)
+signal belt_status_changed(total_charges, total_capacity, can_prime)
 signal combat_mode_changed(is_in_combat)
 signal stealth_feedback_changed(reading_label, reading_detail, pulse_strength)
 
@@ -29,17 +30,20 @@ signal stealth_feedback_changed(reading_label, reading_detail, pulse_strength)
 @export var combat_move_speed := 3.35
 @export var combat_enter_range := 3.2
 @export var combat_exit_range := 4.8
+@export var focus_mode_steel_linger := 0.95
+@export var focus_mode_rite_linger := 1.2
 @export var dodge_speed := 6.25
 @export var dodge_duration := 0.24
 @export var dodge_cooldown := 0.8
 @export var dodge_invulnerability_time := 0.28
 @export var spell_wheel_hold_time := 0.24
 @export var spell_cast_cooldown := 0.7
-@export var spell_burst_damage := 10.0
-@export var spell_burst_radius := 3.4
-@export var spell_heal_amount := 18.0
-@export var spell_gale_surge_speed := 10.5
-@export var spell_stone_veil_duration := 0.9
+@export var hrafn_dash_speed := 12.5
+@export var hrafn_phase_duration := 0.18
+@export var hugr_pulse_duration := 6.5
+@export var hugr_scan_range := 28.0
+@export var gandr_range := 10.5
+@export var gandr_bind_duration := 2.6
 @export var attack_damage := 18.0
 @export var attack_cooldown := 0.55
 @export var attack_windup := 0.14
@@ -57,10 +61,15 @@ signal stealth_feedback_changed(reading_label, reading_detail, pulse_strength)
 @export var blocked_attack_recoil_blend := 0.7
 
 const SPELL_LOADOUT := [
-	{"name": "Ember Burst", "description": "Burn nearby foes."},
-	{"name": "Warden Pulse", "description": "Restore a sliver of health."},
-	{"name": "Gale Surge", "description": "Lunge in your facing direction."},
-	{"name": "Stone Veil", "description": "Gain a brief ward."}
+	{"name": "Hrafn", "description": "Phase through the gap and reform into the hunt.", "charges": 2},
+	{"name": "Hugr", "description": "Listen past sight and draw hostile pulses closer.", "charges": 2},
+	{"name": "Gandr", "description": "Nail a shadow in place and buy yourself room.", "charges": 1}
+]
+
+const SPELL_WHEEL_DIRECTIONS := [
+	Vector2(0.0, -1.0),
+	Vector2(0.8660254, 0.5),
+	Vector2(-0.8660254, 0.5)
 ]
 
 var gravity: float = float(ProjectSettings.get_setting("physics/3d/default_gravity"))
@@ -74,16 +83,21 @@ var health := 100.0
 var damage_invulnerability_remaining := 0.0
 var dodge_cooldown_remaining := 0.0
 var dodge_time_remaining := 0.0
+var focus_mode_remaining := 0.0
 var spell_input_held := false
 var spell_hold_time := 0.0
 var spell_wheel_open := false
 var spell_cast_cooldown_remaining := 0.0
 var selected_spell_index := 0
+var belt_slot_charges: Array[int] = []
 var attack_cooldown_remaining := 0.0
 var attack_phase_time_remaining := 0.0
 var attack_hitbox_active := false
 var hit_targets: Array[Node] = []
 var dodge_direction := Vector3.ZERO
+var hrafn_phase_remaining := 0.0
+var hrafn_reform_snap_pending := false
+var hugr_pulse_remaining := 0.0
 var blocked_attack_recoil_remaining := 0.0
 var blocked_attack_recoil_from := Vector3.ZERO
 var blocked_attack_recoil_target := Vector3.ZERO
@@ -100,6 +114,7 @@ var combat_target: Node3D
 var stealth_feedback_label := "Stillness"
 var stealth_feedback_detail := "No hostile pulse nearby."
 var stealth_feedback_strength := 0.0
+var near_quiet_spot: Node
 
 @onready var camera_rig: Node = $CameraRig
 @onready var collision_shape_node: CollisionShape3D = $CollisionShape3D
@@ -114,6 +129,7 @@ func _ready() -> void:
 	add_to_group("player")
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	health = max_health
+	belt_slot_charges = _get_max_belt_charges()
 	var collision_shape := collision_shape_node.shape as CapsuleShape3D
 	if collision_shape != null:
 		standing_collision_height = collision_shape.height
@@ -125,6 +141,8 @@ func _ready() -> void:
 	sword_pivot.rotation_degrees = sword_rest_rotation
 	health_changed.emit(health, max_health)
 	stealth_feedback_changed.emit(stealth_feedback_label, stealth_feedback_detail, stealth_feedback_strength)
+	_emit_spell_selection_changed()
+	_emit_belt_status_changed()
 	if camera_rig != null and camera_rig.has_method("set_combat_mode"):
 		camera_rig.set_combat_mode(false)
 
@@ -139,6 +157,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_released("spell"):
 		_on_spell_released()
 		return
+	if event.is_action_pressed("interact"):
+		_attempt_belt_prime()
+		return
 	if event.is_action_pressed("ui_cancel"):
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -149,8 +170,14 @@ func _physics_process(delta: float) -> void:
 		damage_invulnerability_remaining = maxf(damage_invulnerability_remaining - delta, 0.0)
 	if dodge_cooldown_remaining > 0.0:
 		dodge_cooldown_remaining = maxf(dodge_cooldown_remaining - delta, 0.0)
+	if focus_mode_remaining > 0.0:
+		focus_mode_remaining = maxf(focus_mode_remaining - delta, 0.0)
 	if spell_cast_cooldown_remaining > 0.0:
 		spell_cast_cooldown_remaining = maxf(spell_cast_cooldown_remaining - delta, 0.0)
+	if hrafn_phase_remaining > 0.0:
+		hrafn_phase_remaining = maxf(hrafn_phase_remaining - delta, 0.0)
+	if hugr_pulse_remaining > 0.0:
+		hugr_pulse_remaining = maxf(hugr_pulse_remaining - delta, 0.0)
 	if spell_input_held:
 		spell_hold_time += delta
 		if not spell_wheel_open and spell_hold_time >= spell_wheel_hold_time:
@@ -160,6 +187,8 @@ func _physics_process(delta: float) -> void:
 		if dodge_time_remaining <= 0.0:
 			is_dodging = false
 			dodge_direction = Vector3.ZERO
+			if hrafn_reform_snap_pending:
+				_apply_hrafn_reform_snap()
 	if attack_cooldown_remaining > 0.0:
 		attack_cooldown_remaining = maxf(attack_cooldown_remaining - delta, 0.0)
 	_update_combat_state(delta)
@@ -169,14 +198,13 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector3.ZERO
 		return
 
-	_update_combat_mode()
-
 	var input_vector := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	_update_crouch_state(delta)
 	_update_stealth_feedback()
-	var move_direction := _get_move_direction(input_vector)
 	if spell_wheel_open:
 		_update_spell_selection(input_vector)
+
+	var move_direction := _get_move_direction(input_vector)
 
 	if not spell_wheel_open and Input.is_action_just_pressed("dodge"):
 		_start_dodge(move_direction)
@@ -185,10 +213,18 @@ func _physics_process(delta: float) -> void:
 		_start_attack()
 
 	is_blocking = Input.is_action_pressed("block") and not is_attacking and not is_crouching and not is_dodging and not spell_wheel_open
+	if is_blocking:
+		_refresh_focus_mode(focus_mode_steel_linger)
+
+	_update_combat_mode()
+	move_direction = _get_move_direction(input_vector)
 
 	var target_velocity := move_direction * _get_move_speed(input_vector)
 	if is_dodging:
-		target_velocity = dodge_direction * dodge_speed
+		var active_dodge_speed := dodge_speed
+		if hrafn_phase_remaining > 0.0:
+			active_dodge_speed = hrafn_dash_speed
+		target_velocity = dodge_direction * active_dodge_speed
 	elif spell_wheel_open:
 		target_velocity = Vector3.ZERO
 	velocity.x = move_toward(velocity.x, target_velocity.x, acceleration * delta)
@@ -209,7 +245,7 @@ func _physics_process(delta: float) -> void:
 		facing_direction = dodge_direction
 
 	if not spell_wheel_open and is_in_combat_mode:
-		_rotate_toward_combat_target(delta)
+		_rotate_toward_focus_forward(delta)
 	elif not spell_wheel_open and facing_direction != Vector3.ZERO:
 		var target_yaw := Vector3.FORWARD.signed_angle_to(facing_direction, Vector3.UP)
 		rotation.y = lerp_angle(rotation.y, target_yaw, 1.0 - exp(-rotation_speed * delta))
@@ -286,16 +322,8 @@ func _get_capsule_top(center_y: float, capsule_height: float, capsule_radius: fl
 
 
 func _update_combat_mode() -> void:
-	var lock_distance := combat_enter_range
-	if is_in_combat_mode:
-		lock_distance = maxf(combat_exit_range, combat_enter_range)
-
-	var next_target := _find_closest_enemy(lock_distance)
-	if next_target == null:
-		_set_combat_mode(false, null)
-		return
-
-	_set_combat_mode(true, next_target)
+	var next_target := _find_closest_enemy(maxf(combat_enter_range, combat_exit_range))
+	_set_combat_mode(_wants_focus_mode(), next_target)
 
 
 func _set_combat_mode(next_mode: bool, next_target: Node3D) -> void:
@@ -312,6 +340,24 @@ func _set_combat_mode(next_mode: bool, next_target: Node3D) -> void:
 		camera_rig.set_combat_mode(is_in_combat_mode)
 
 	combat_mode_changed.emit(is_in_combat_mode)
+
+
+func _wants_focus_mode() -> bool:
+	if is_dead:
+		return false
+	if spell_input_held or spell_wheel_open or is_attacking or is_blocking:
+		return true
+	if is_dodging and (hrafn_phase_remaining > 0.0 or hrafn_reform_snap_pending):
+		return true
+	if blocked_attack_recoil_remaining > 0.0:
+		return true
+	return focus_mode_remaining > 0.0
+
+
+func _refresh_focus_mode(duration: float) -> void:
+	if duration <= 0.0:
+		return
+	focus_mode_remaining = maxf(focus_mode_remaining, duration)
 
 
 func _find_closest_enemy(max_distance: float) -> Node3D:
@@ -340,14 +386,6 @@ func _get_move_direction(input_vector: Vector2) -> Vector3:
 	if input_vector == Vector2.ZERO:
 		return Vector3.ZERO
 
-	if is_in_combat_mode and combat_target != null and is_instance_valid(combat_target):
-		var to_target := combat_target.global_position - global_position
-		to_target.y = 0.0
-		if to_target.length_squared() > 0.0001:
-			var combat_forward := to_target.normalized()
-			var combat_right := Vector3.UP.cross(combat_forward).normalized()
-			return (-combat_right * input_vector.x - combat_forward * input_vector.y).normalized()
-
 	if camera_rig != null and camera_rig.has_method("get_camera_planar_basis"):
 		var camera_basis: Basis = camera_rig.get_camera_planar_basis()
 		return (camera_basis.x * input_vector.x + camera_basis.z * input_vector.y).normalized()
@@ -355,16 +393,16 @@ func _get_move_direction(input_vector: Vector2) -> Vector3:
 	return Vector3.ZERO
 
 
-func _rotate_toward_combat_target(delta: float) -> void:
-	if combat_target == null or not is_instance_valid(combat_target):
+func _rotate_toward_focus_forward(delta: float) -> void:
+	var focus_forward := -global_basis.z
+	if camera_rig != null and camera_rig.has_method("get_camera_planar_basis"):
+		var camera_basis: Basis = camera_rig.get_camera_planar_basis()
+		focus_forward = -camera_basis.z
+	focus_forward.y = 0.0
+	if focus_forward.length_squared() <= 0.0001:
 		return
 
-	var to_target := combat_target.global_position - global_position
-	to_target.y = 0.0
-	if to_target.length_squared() <= 0.0001:
-		return
-
-	var target_yaw := Vector3.FORWARD.signed_angle_to(to_target.normalized(), Vector3.UP)
+	var target_yaw := Vector3.FORWARD.signed_angle_to(focus_forward.normalized(), Vector3.UP)
 	rotation.y = lerp_angle(rotation.y, target_yaw, 1.0 - exp(-rotation_speed * delta))
 
 
@@ -382,8 +420,40 @@ func get_spell_descriptions() -> Array[String]:
 	return spell_descriptions
 
 
+func get_spell_charges() -> Array[int]:
+	var spell_charges: Array[int] = []
+	for slot_charge in belt_slot_charges:
+		spell_charges.append(int(slot_charge))
+	return spell_charges
+
+
 func get_selected_spell_index() -> int:
 	return selected_spell_index
+
+
+func get_belt_total_charges() -> int:
+	var total := 0
+	for slot_charge in belt_slot_charges:
+		total += int(slot_charge)
+	return total
+
+
+func get_belt_total_capacity() -> int:
+	return _get_total_belt_capacity()
+
+
+func can_reprime_belt() -> bool:
+	return near_quiet_spot != null and is_instance_valid(near_quiet_spot)
+
+
+func set_near_quiet_spot(next_quiet_spot: Node) -> void:
+	if near_quiet_spot == next_quiet_spot:
+		return
+
+	near_quiet_spot = next_quiet_spot
+	if near_quiet_spot != null and not is_instance_valid(near_quiet_spot):
+		near_quiet_spot = null
+	_emit_belt_status_changed()
 
 
 func get_stealth_feedback_label() -> String:
@@ -416,6 +486,7 @@ func _update_stealth_feedback() -> void:
 	var next_detail := "No hostile pulse nearby."
 	var next_strength := 0.0
 	var closest_distance := INF
+	var hugr_is_active := hugr_pulse_remaining > 0.0
 
 	for enemy: Node in get_tree().get_nodes_in_group("enemy"):
 		if enemy == null or not is_instance_valid(enemy):
@@ -427,11 +498,18 @@ func _update_stealth_feedback() -> void:
 		if enemy_node == null:
 			continue
 
+		var distance_to_enemy := enemy_node.global_position.distance_to(global_position)
 		var intensity := float(enemy.get_heartbeat_intensity())
+		if intensity <= 0.0:
+			if not hugr_is_active:
+				continue
+			if distance_to_enemy > hugr_scan_range:
+				continue
+			intensity = clampf(1.0 - distance_to_enemy / maxf(hugr_scan_range, 0.001), 0.08, 0.22)
+
 		if intensity <= 0.0:
 			continue
 
-		var distance_to_enemy := enemy_node.global_position.distance_to(global_position)
 		if intensity > next_strength or (is_equal_approx(intensity, next_strength) and distance_to_enemy < closest_distance):
 			next_strength = intensity
 			closest_distance = distance_to_enemy
@@ -441,10 +519,15 @@ func _update_stealth_feedback() -> void:
 				next_detail = enemy.get_heartbeat_detail()
 
 	if next_strength <= 0.0:
-		if is_crouching:
+		if hugr_is_active:
+			next_label = "Listening"
+			next_detail = "Hugr listens into the fog, but no pulse answers."
+		elif is_crouching:
 			next_detail = "Your breath stays low. A crouched silhouette carries less easily."
 		else:
 			next_detail = "No hostile pulse nearby. Standing in the open carries further."
+	elif hugr_is_active:
+		next_detail = "%s Hugr carries it through the fog." % next_detail
 
 	if stealth_feedback_label == next_label and stealth_feedback_detail == next_detail and is_equal_approx(stealth_feedback_strength, next_strength):
 		return
@@ -491,11 +574,7 @@ func _update_spell_selection(input_vector: Vector2) -> void:
 	if input_vector.length_squared() <= 0.25:
 		return
 
-	var next_spell_index := selected_spell_index
-	if absf(input_vector.x) > absf(input_vector.y):
-		next_spell_index = 1 if input_vector.x > 0.0 else 3
-	else:
-		next_spell_index = 0 if input_vector.y < 0.0 else 2
+	var next_spell_index := _get_spell_wheel_index(input_vector)
 
 	if next_spell_index == selected_spell_index:
 		return
@@ -505,28 +584,109 @@ func _update_spell_selection(input_vector: Vector2) -> void:
 
 
 func _emit_spell_selection_changed() -> void:
-	spell_selection_changed.emit(get_spell_names(), get_spell_descriptions(), selected_spell_index)
+	spell_selection_changed.emit(get_spell_names(), get_spell_descriptions(), get_spell_charges(), selected_spell_index)
+
+
+func _emit_belt_status_changed() -> void:
+	belt_status_changed.emit(get_belt_total_charges(), _get_total_belt_capacity(), can_reprime_belt())
+
+
+func _get_spell_wheel_index(input_vector: Vector2) -> int:
+	if SPELL_LOADOUT.size() == SPELL_WHEEL_DIRECTIONS.size():
+		var best_index := selected_spell_index
+		var best_dot := -INF
+		var normalized_input := input_vector.normalized()
+		for direction_index: int in range(SPELL_WHEEL_DIRECTIONS.size()):
+			var dot_value := normalized_input.dot(SPELL_WHEEL_DIRECTIONS[direction_index])
+			if dot_value > best_dot:
+				best_dot = dot_value
+				best_index = direction_index
+		return best_index
+
+	if absf(input_vector.x) > absf(input_vector.y):
+		return 1 if input_vector.x > 0.0 else max(SPELL_LOADOUT.size() - 1, 0)
+	return 0 if input_vector.y < 0.0 else min(2, SPELL_LOADOUT.size() - 1)
+
+
+func _get_max_belt_charges() -> Array[int]:
+	var max_charges: Array[int] = []
+	for spell_data: Dictionary in SPELL_LOADOUT:
+		max_charges.append(int(spell_data.get("charges", 1)))
+	return max_charges
+
+
+func _get_total_belt_capacity() -> int:
+	var total_capacity := 0
+	for spell_data: Dictionary in SPELL_LOADOUT:
+		total_capacity += int(spell_data.get("charges", 1))
+	return total_capacity
+
+
+func _is_belt_full() -> bool:
+	for slot_index: int in range(belt_slot_charges.size()):
+		if belt_slot_charges[slot_index] < int(SPELL_LOADOUT[slot_index].get("charges", 1)):
+			return false
+	return true
+
+
+func _has_spell_charge(slot_index: int) -> bool:
+	return slot_index >= 0 and slot_index < belt_slot_charges.size() and belt_slot_charges[slot_index] > 0
+
+
+func _consume_spell_charge(slot_index: int) -> void:
+	if not _has_spell_charge(slot_index):
+		return
+	belt_slot_charges[slot_index] = maxi(belt_slot_charges[slot_index] - 1, 0)
+
+
+func _attempt_belt_prime() -> void:
+	if not can_reprime_belt():
+		return
+
+	if _is_belt_full():
+		spell_cast.emit("Hodd", "The belt is already primed.")
+		_emit_belt_status_changed()
+		return
+
+	belt_slot_charges = _get_max_belt_charges()
+	_emit_spell_selection_changed()
+	_emit_belt_status_changed()
+	var prompt_name := "The Quiet Spot"
+	if near_quiet_spot != null and near_quiet_spot.has_method("get_prompt_name"):
+		prompt_name = near_quiet_spot.get_prompt_name()
+	spell_cast.emit("Hodd", "%s steadies your hands. The belt is re-primed." % prompt_name)
 
 
 func _cast_selected_spell() -> void:
 	if not _can_cast_spell():
 		return
 
-	spell_cast_cooldown_remaining = spell_cast_cooldown
-	var cast_text := ""
+	var spell_name := String(SPELL_LOADOUT[selected_spell_index].get("name", "Spell"))
+	if not _has_spell_charge(selected_spell_index):
+		spell_cast.emit(spell_name, "That slot lies empty. Reach a Quiet Spot to re-prime the Hodd.")
+		_emit_belt_status_changed()
+		return
+
+	var cast_result := {"success": false, "text": "Nothing happens."}
 	match selected_spell_index:
 		0:
-			cast_text = _cast_ember_burst()
+			cast_result = _cast_hrafn()
 		1:
-			cast_text = _cast_warden_pulse()
+			cast_result = _cast_hugr()
 		2:
-			cast_text = _cast_gale_surge()
-		3:
-			cast_text = _cast_stone_veil()
+			cast_result = _cast_gandr()
 		_:
-			cast_text = "Nothing happens."
+			cast_result = {"success": false, "text": "Nothing happens."}
 
-	spell_cast.emit(SPELL_LOADOUT[selected_spell_index].get("name", "Spell"), cast_text)
+	spell_cast.emit(spell_name, String(cast_result.get("text", "Nothing happens.")))
+	if not bool(cast_result.get("success", false)):
+		return
+
+	_refresh_focus_mode(focus_mode_rite_linger)
+	spell_cast_cooldown_remaining = spell_cast_cooldown
+	_consume_spell_charge(selected_spell_index)
+	_emit_spell_selection_changed()
+	_emit_belt_status_changed()
 
 
 func _can_cast_spell() -> bool:
@@ -537,45 +697,50 @@ func _can_cast_spell() -> bool:
 	return true
 
 
-func _cast_ember_burst() -> String:
-	var hit_count := 0
+func _cast_hrafn() -> Dictionary:
+	var surge_direction := _get_spell_direction()
+	is_dodging = true
+	is_blocking = false
+	attack_phase_time_remaining = 0.0
+	hit_targets.clear()
+	_set_attack_hitbox_enabled(false)
+	sword_pivot.rotation_degrees = sword_rest_rotation
+	dodge_direction = surge_direction
+	dodge_time_remaining = hrafn_phase_duration
+	hrafn_phase_remaining = hrafn_phase_duration
+	hrafn_reform_snap_pending = true
+	damage_invulnerability_remaining = maxf(damage_invulnerability_remaining, hrafn_phase_duration + 0.12)
+	velocity.x = dodge_direction.x * hrafn_dash_speed
+	velocity.z = dodge_direction.z * hrafn_dash_speed
+	return {"success": true, "text": "Hrafn tears you through the gap."}
+
+
+func _cast_hugr() -> Dictionary:
+	hugr_pulse_remaining = maxf(hugr_pulse_remaining, hugr_pulse_duration)
+	var heard_count := 0
 	for enemy: Node in get_tree().get_nodes_in_group("enemy"):
 		if enemy == null or not is_instance_valid(enemy):
-			continue
-		if not enemy.has_method("take_damage"):
 			continue
 		var enemy_body := enemy as Node3D
 		if enemy_body == null:
 			continue
-		if enemy_body.global_position.distance_to(global_position) > spell_burst_radius:
-			continue
-		enemy.take_damage(spell_burst_damage, global_position, self)
-		hit_count += 1
+		if enemy_body.global_position.distance_to(global_position) <= hugr_scan_range:
+			heard_count += 1
 
-	if hit_count == 0:
-		return "Ember Burst crackles, but catches nothing."
-	return "Ember Burst scorches %d foe%s." % [hit_count, "s" if hit_count != 1 else ""]
+	if heard_count <= 0:
+		return {"success": true, "text": "Hugr listens into the fog, but no pulse answers."}
+	return {"success": true, "text": "Hugr counts %d hostile pulse%s in the dark." % [heard_count, "s" if heard_count != 1 else ""]}
 
 
-func _cast_warden_pulse() -> String:
-	var previous_health := health
-	health = minf(health + spell_heal_amount, max_health)
-	if health != previous_health:
-		health_changed.emit(health, max_health)
-	return "Warden Pulse restores %d health." % int(round(health - previous_health))
+func _cast_gandr() -> Dictionary:
+	var target_enemy := _find_closest_enemy_in_range(gandr_range)
+	if target_enemy == null:
+		return {"success": false, "text": "Gandr finds no shadow close enough to nail."}
+	if not target_enemy.has_method("apply_gandr_bind"):
+		return {"success": false, "text": "That foe slips free of Gandr."}
 
-
-func _cast_gale_surge() -> String:
-	var surge_direction := _get_spell_direction()
-	velocity.x = surge_direction.x * spell_gale_surge_speed
-	velocity.z = surge_direction.z * spell_gale_surge_speed
-	damage_invulnerability_remaining = maxf(damage_invulnerability_remaining, 0.15)
-	return "Gale Surge hurls you into position."
-
-
-func _cast_stone_veil() -> String:
-	damage_invulnerability_remaining = maxf(damage_invulnerability_remaining, spell_stone_veil_duration)
-	return "Stone Veil hardens around you for a moment."
+	target_enemy.apply_gandr_bind(gandr_bind_duration)
+	return {"success": true, "text": "Gandr nails %s in place." % target_enemy.name}
 
 
 func _get_spell_direction() -> Vector3:
@@ -594,11 +759,45 @@ func _get_spell_direction() -> Vector3:
 	return facing_direction.normalized()
 
 
+func _apply_hrafn_reform_snap() -> void:
+	hrafn_reform_snap_pending = false
+	var camera_forward := -global_basis.z
+	if camera_rig != null and camera_rig.has_method("get_camera_planar_basis"):
+		var camera_basis: Basis = camera_rig.get_camera_planar_basis()
+		camera_forward = -camera_basis.z
+	camera_forward.y = 0.0
+	if camera_forward.length_squared() <= 0.0001:
+		return
+
+	rotation.y = Vector3.FORWARD.signed_angle_to(camera_forward.normalized(), Vector3.UP)
+
+
+func _find_closest_enemy_in_range(max_distance: float) -> Node3D:
+	var closest_enemy: Node3D
+	var closest_distance := max_distance
+	for enemy: Node in get_tree().get_nodes_in_group("enemy"):
+		if enemy == null or not is_instance_valid(enemy):
+			continue
+		var enemy_node := enemy as Node3D
+		if enemy_node == null:
+			continue
+		var planar_offset := enemy_node.global_position - global_position
+		planar_offset.y = 0.0
+		var enemy_distance := planar_offset.length()
+		if enemy_distance > closest_distance:
+			continue
+		closest_distance = enemy_distance
+		closest_enemy = enemy_node
+
+	return closest_enemy
+
+
 func _start_attack() -> void:
 	if is_dead or is_attacking or is_blocking or is_dodging or spell_wheel_open or attack_cooldown_remaining > 0.0:
 		return
 
 	is_attacking = true
+	_refresh_focus_mode(focus_mode_steel_linger)
 	is_blocking = false
 	attack_phase_time_remaining = 0.0
 	attack_cooldown_remaining = attack_cooldown
@@ -622,6 +821,8 @@ func _start_dodge(move_direction: Vector3) -> void:
 	dodge_time_remaining = dodge_duration
 	dodge_cooldown_remaining = dodge_cooldown
 	damage_invulnerability_remaining = maxf(damage_invulnerability_remaining, dodge_invulnerability_time)
+	hrafn_phase_remaining = 0.0
+	hrafn_reform_snap_pending = false
 
 	if move_direction == Vector3.ZERO:
 		dodge_direction = -global_basis.z
@@ -859,6 +1060,10 @@ func _die() -> void:
 	damage_invulnerability_remaining = 0.0
 	dodge_cooldown_remaining = 0.0
 	dodge_time_remaining = 0.0
+	focus_mode_remaining = 0.0
+	hrafn_phase_remaining = 0.0
+	hrafn_reform_snap_pending = false
+	hugr_pulse_remaining = 0.0
 	hit_reaction_remaining = 0.0
 	block_reaction_remaining = 0.0
 	_set_attack_hitbox_enabled(false)

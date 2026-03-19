@@ -7,13 +7,16 @@ extends Node3D
 @export var vertical_offset := 0.35
 @export var follow_distance := 4.4
 @export var moving_follow_distance := 3.8
-@export var focus_shoulder_offset := 0.65
-@export var focus_moving_shoulder_offset := 0.55
-@export var focus_follow_distance := 3.7
-@export var focus_moving_follow_distance := 3.25
+@export var focus_shoulder_offset := 0.22
+@export var focus_moving_shoulder_offset := 0.14
+@export var focus_follow_distance := 3.3
+@export var focus_moving_follow_distance := 2.95
 @export var mouse_sensitivity := 0.0025
 @export var pitch_min_degrees := -45.0
 @export var pitch_max_degrees := 30.0
+@export var focus_pitch_min_degrees := -28.0
+@export var focus_pitch_max_degrees := 18.0
+@export_range(0.2, 1.0, 0.05) var focus_mouse_sensitivity_multiplier := 0.8
 @export var rig_follow_smoothing := 14.0
 @export var orbit_smoothing := 16.0
 @export var camera_smoothing := 18.0
@@ -61,13 +64,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event is InputEventMouseMotion:
+		var active_mouse_sensitivity := mouse_sensitivity
+		if is_in_combat_mode:
+			active_mouse_sensitivity *= focus_mouse_sensitivity_multiplier
 		if _has_movement_input():
 			time_since_orbit_input = 0.0
-		yaw -= event.relative.x * mouse_sensitivity
+		yaw -= event.relative.x * active_mouse_sensitivity
 		pitch = clamp(
-			pitch - event.relative.y * mouse_sensitivity,
-			deg_to_rad(pitch_min_degrees),
-			deg_to_rad(pitch_max_degrees)
+			pitch - event.relative.y * active_mouse_sensitivity,
+			deg_to_rad(_get_active_pitch_min_degrees()),
+			deg_to_rad(_get_active_pitch_max_degrees())
 		)
 
 func _physics_process(delta: float) -> void:
@@ -77,6 +83,7 @@ func _physics_process(delta: float) -> void:
 	time_since_orbit_input += delta
 	free_look_grace = lerpf(free_look_grace, free_look_grace_target, _smooth_weight(6.0, delta))
 	focus_height = lerpf(focus_height, focus_target_height, _smooth_weight(rig_follow_smoothing, delta))
+	pitch = clamp(pitch, deg_to_rad(_get_active_pitch_min_degrees()), deg_to_rad(_get_active_pitch_max_degrees()))
 	global_position = global_position.lerp(_get_focus_position(), _smooth_weight(rig_follow_smoothing, delta))
 	var input_vector := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var is_horizontal_turning := absf(input_vector.x) > 0.1 and absf(input_vector.x) >= absf(input_vector.y)
@@ -141,6 +148,12 @@ func _get_active_follow_distance() -> float:
 
 func _get_active_moving_follow_distance() -> float:
 	return focus_moving_follow_distance if is_in_combat_mode else moving_follow_distance
+
+func _get_active_pitch_min_degrees() -> float:
+	return focus_pitch_min_degrees if is_in_combat_mode else pitch_min_degrees
+
+func _get_active_pitch_max_degrees() -> float:
+	return focus_pitch_max_degrees if is_in_combat_mode else pitch_max_degrees
 
 func _get_active_movement_recenter_speed() -> float:
 	return focus_movement_recenter_speed if is_in_combat_mode else movement_recenter_speed

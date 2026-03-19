@@ -59,6 +59,7 @@ var block_reaction_side := 1.0
 var awareness_state := AwarenessState.IDLE
 var suspicion := 0.0
 var search_time_remaining := 0.0
+var gandr_bind_remaining := 0.0
 var can_see_player := false
 var has_last_known_player_position := false
 var last_known_player_position := Vector3.ZERO
@@ -88,6 +89,11 @@ func _physics_process(delta: float) -> void:
 		attack_cooldown_remaining = maxf(attack_cooldown_remaining - delta, 0.0)
 	if chase_resume_delay_remaining > 0.0:
 		chase_resume_delay_remaining = maxf(chase_resume_delay_remaining - delta, 0.0)
+	var was_bound := gandr_bind_remaining > 0.0
+	if gandr_bind_remaining > 0.0:
+		gandr_bind_remaining = maxf(gandr_bind_remaining - delta, 0.0)
+	if was_bound != (gandr_bind_remaining > 0.0):
+		_update_awareness_visuals()
 	_update_attack(delta)
 	_update_feedback_state(delta)
 
@@ -128,6 +134,10 @@ func _physics_process(delta: float) -> void:
 					current_chase_speed = chase_speed * 0.82
 				else:
 					current_chase_speed = chase_speed * 0.55
+
+	if gandr_bind_remaining > 0.0:
+		move_direction = Vector3.ZERO
+		current_chase_speed = 0.0
 
 	if look_direction.length_squared() > 0.0001:
 		var target_yaw := Vector3.FORWARD.signed_angle_to(look_direction.normalized(), Vector3.UP)
@@ -259,7 +269,10 @@ func _update_awareness_visuals() -> void:
 	if health_bar_status_label == null:
 		return
 
-	health_bar_status_label.text = get_awareness_state_name()
+	var status_text := get_awareness_state_name()
+	if gandr_bind_remaining > 0.0:
+		status_text = "%s (Bound)" % status_text
+	health_bar_status_label.text = status_text
 	match awareness_state:
 		AwarenessState.IDLE:
 			health_bar_status_label.modulate = Color(0.72, 0.82, 0.74, 0.95)
@@ -526,6 +539,19 @@ func take_damage(amount: float, source_position: Vector3 = Vector3.ZERO, source:
 
 	if health <= 0.0:
 		queue_free()
+
+
+func apply_gandr_bind(duration: float) -> void:
+	if duration <= 0.0:
+		return
+
+	gandr_bind_remaining = maxf(gandr_bind_remaining, duration)
+	suspicion = maxf(suspicion, suspicious_threshold)
+	search_time_remaining = maxf(search_time_remaining, duration)
+	if player_target != null and is_instance_valid(player_target):
+		last_known_player_position = player_target.global_position
+		has_last_known_player_position = true
+	_update_awareness_visuals()
 
 
 func get_awareness_state_name() -> String:

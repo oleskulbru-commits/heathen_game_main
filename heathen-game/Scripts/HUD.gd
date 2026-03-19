@@ -1,10 +1,9 @@
 extends CanvasLayer
 
 const SPELL_WHEEL_OFFSETS := [
-	Vector2(0.0, -148.0),
-	Vector2(188.0, 0.0),
-	Vector2(0.0, 148.0),
-	Vector2(-188.0, 0.0)
+	Vector2(0.0, -154.0),
+	Vector2(152.0, 94.0),
+	Vector2(-152.0, 94.0)
 ]
 
 @onready var health_label: Label = $HealthPanel/HealthMargin/HealthVBox/HealthLabel
@@ -15,9 +14,11 @@ const SPELL_WHEEL_OFFSETS := [
 var player: Node
 var spell_names: Array[String] = []
 var spell_descriptions: Array[String] = []
+var spell_charges: Array[int] = []
 var selected_spell_index := 0
 var spell_wheel_overlay: Control
 var spell_status_label: Label
+var hodd_status_label: Label
 var spell_hint_label: Label
 var spell_feedback_label: Label
 var spell_center_title_label: Label
@@ -28,6 +29,9 @@ var spell_option_description_labels: Array[Label] = []
 var threat_status_label: Label
 var threat_detail_label: Label
 var threat_meter: ProgressBar
+var belt_total_charges := 0
+var belt_total_capacity := 0
+var can_prime_belt := false
 
 
 func _ready() -> void:
@@ -51,10 +55,13 @@ func _bind_player() -> void:
 	player.connect("spell_wheel_toggled", Callable(self, "_on_spell_wheel_toggled"))
 	player.connect("spell_selection_changed", Callable(self, "_on_spell_selection_changed"))
 	player.connect("spell_cast", Callable(self, "_on_spell_cast"))
+	player.connect("belt_status_changed", Callable(self, "_on_belt_status_changed"))
 	player.connect("stealth_feedback_changed", Callable(self, "_on_player_stealth_feedback_changed"))
 	_on_player_health_changed(float(player.get("health")), float(player.get("max_health")))
-	if player.has_method("get_spell_names") and player.has_method("get_spell_descriptions") and player.has_method("get_selected_spell_index"):
-		_on_spell_selection_changed(player.get_spell_names(), player.get_spell_descriptions(), int(player.get_selected_spell_index()))
+	if player.has_method("get_spell_names") and player.has_method("get_spell_descriptions") and player.has_method("get_spell_charges") and player.has_method("get_selected_spell_index"):
+		_on_spell_selection_changed(player.get_spell_names(), player.get_spell_descriptions(), player.get_spell_charges(), int(player.get_selected_spell_index()))
+	if player.has_method("get_belt_total_charges") and player.has_method("get_belt_total_capacity") and player.has_method("can_reprime_belt"):
+		_on_belt_status_changed(player.get_belt_total_charges(), player.get_belt_total_capacity(), player.can_reprime_belt())
 	if player.has_method("get_stealth_feedback_label") and player.has_method("get_stealth_feedback_detail") and player.has_method("get_stealth_feedback_strength"):
 		_on_player_stealth_feedback_changed(player.get_stealth_feedback_label(), player.get_stealth_feedback_detail(), player.get_stealth_feedback_strength())
 
@@ -134,16 +141,20 @@ func _build_spell_ui() -> void:
 	status_margin.add_child(status_vbox)
 
 	spell_status_label = Label.new()
-	spell_status_label.text = "Spell: Ember Burst"
+	spell_status_label.text = "Rite: Hrafn x2"
 	status_vbox.add_child(spell_status_label)
 
+	hodd_status_label = Label.new()
+	hodd_status_label.text = "Hodd: 5 / 5 primed"
+	status_vbox.add_child(hodd_status_label)
+
 	spell_hint_label = Label.new()
-	spell_hint_label.text = "Tap Q to cast. Hold Q + WASD to select."
+	spell_hint_label.text = "Tap Q to invoke. Hold Q + move to choose the next rite."
 	spell_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_vbox.add_child(spell_hint_label)
 
 	spell_feedback_label = Label.new()
-	spell_feedback_label.text = "Placeholder spells are active."
+	spell_feedback_label.text = "The Hodd holds three primed rites."
 	spell_feedback_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_vbox.add_child(spell_feedback_label)
 
@@ -181,7 +192,7 @@ func _build_spell_ui() -> void:
 
 	spell_center_title_label = Label.new()
 	spell_center_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	spell_center_title_label.text = "Selected Spell"
+	spell_center_title_label.text = "Selected Rite"
 	center_vbox.add_child(spell_center_title_label)
 
 	spell_center_description_label = Label.new()
@@ -232,10 +243,18 @@ func _on_spell_wheel_toggled(is_visible: bool) -> void:
 	_refresh_spell_ui()
 
 
-func _on_spell_selection_changed(next_spell_names: Array[String], next_spell_descriptions: Array[String], next_selected_spell_index: int) -> void:
+func _on_spell_selection_changed(next_spell_names: Array[String], next_spell_descriptions: Array[String], next_spell_charges: Array[int], next_selected_spell_index: int) -> void:
 	spell_names = next_spell_names
 	spell_descriptions = next_spell_descriptions
+	spell_charges = next_spell_charges
 	selected_spell_index = next_selected_spell_index
+	_refresh_spell_ui()
+
+
+func _on_belt_status_changed(total_charges: int, total_capacity: int, can_prime: bool) -> void:
+	belt_total_charges = total_charges
+	belt_total_capacity = total_capacity
+	can_prime_belt = can_prime
 	_refresh_spell_ui()
 
 
@@ -255,14 +274,25 @@ func _on_player_stealth_feedback_changed(reading_label: String, reading_detail: 
 func _refresh_spell_ui() -> void:
 	var selected_spell_name := "None"
 	var selected_spell_description := "No spell selected."
+	var selected_spell_charge := 0
 	if not spell_names.is_empty() and selected_spell_index >= 0 and selected_spell_index < spell_names.size():
 		selected_spell_name = spell_names[selected_spell_index]
 		if selected_spell_index < spell_descriptions.size():
 			selected_spell_description = spell_descriptions[selected_spell_index]
+		if selected_spell_index < spell_charges.size():
+			selected_spell_charge = spell_charges[selected_spell_index]
 
-	spell_status_label.text = "Spell: %s" % selected_spell_name
+	spell_status_label.text = "Rite: %s x%d" % [selected_spell_name, selected_spell_charge]
+	if hodd_status_label != null:
+		hodd_status_label.text = "Hodd: %d / %d primed" % [belt_total_charges, belt_total_capacity]
+	if belt_total_charges <= 0:
+		spell_hint_label.text = "The Hodd is empty. Reach a Quiet Spot and press E to re-prime it."
+	elif can_prime_belt and belt_total_charges < belt_total_capacity:
+		spell_hint_label.text = "Press E at the Quiet Spot to re-prime your Hodd."
+	else:
+		spell_hint_label.text = "Tap Q to invoke. Hold Q + move to choose the next rite."
 	spell_center_title_label.text = selected_spell_name
-	spell_center_description_label.text = selected_spell_description
+	spell_center_description_label.text = "%s\nPrimed: %d" % [selected_spell_description, selected_spell_charge]
 
 	for option_index: int in range(spell_option_panels.size()):
 		var has_spell := option_index < spell_names.size()
@@ -270,11 +300,13 @@ func _refresh_spell_ui() -> void:
 		if not has_spell:
 			continue
 
-		spell_option_name_labels[option_index].text = spell_names[option_index]
-		spell_option_description_labels[option_index].text = spell_descriptions[option_index] if option_index < spell_descriptions.size() else ""
+		var option_charge := spell_charges[option_index] if option_index < spell_charges.size() else 0
+		spell_option_name_labels[option_index].text = "%s x%d" % [spell_names[option_index], option_charge]
+		var option_description := spell_descriptions[option_index] if option_index < spell_descriptions.size() else ""
+		spell_option_description_labels[option_index].text = "%s\nPrimed: %d" % [option_description, option_charge]
 		if option_index == selected_spell_index:
-			spell_option_panels[option_index].modulate = Color(1.18, 1.05, 0.82, 1.0)
+			spell_option_panels[option_index].modulate = Color(1.18, 1.05, 0.82, 0.56 if option_charge <= 0 else 1.0)
 			spell_option_panels[option_index].scale = Vector2.ONE * 1.04
 		else:
-			spell_option_panels[option_index].modulate = Color(0.82, 0.86, 0.92, 0.92)
+			spell_option_panels[option_index].modulate = Color(0.82, 0.86, 0.92, 0.4 if option_charge <= 0 else 0.92)
 			spell_option_panels[option_index].scale = Vector2.ONE
