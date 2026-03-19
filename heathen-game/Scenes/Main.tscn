@@ -1,0 +1,146 @@
+[gd_scene format=3 uid="uid://c8wt0o4yel55v"]
+
+[ext_resource type="PackedScene" uid="uid://oy65fknx3h4u" path="res://Scenes/Player.tscn" id="1_player"]
+[ext_resource type="PackedScene" path="res://Scenes/Ground.tscn" id="2_ground"]
+[ext_resource type="PackedScene" uid="uid://dff4ucna2h1py" path="res://Scenes/Bandit.tscn" id="3_bandit"]
+[ext_resource type="PackedScene" path="res://Scenes/HUD.tscn" id="4_hud"]
+[ext_resource type="Script" uid="uid://750c7r0lp0ko" path="res://Scripts/QuietSpot.gd" id="5_quiet_spot_script"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_quiet_spot"]
+albedo_color = Color(0.22, 0.17, 0.12, 1)
+emission_enabled = true
+emission = Color(0.84, 0.43, 0.18, 1)
+emission_energy_multiplier = 0.55
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_quiet_spot"]
+top_radius = 1.45
+bottom_radius = 1.45
+height = 0.12
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_quiet_spot"]
+height = 1.8
+radius = 1.6
+
+[sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_idj7w"]
+
+[sub_resource type="Sky" id="Sky_kln2b"]
+sky_material = SubResource("PhysicalSkyMaterial_idj7w")
+
+[sub_resource type="Environment" id="Environment_idj7w"]
+background_mode = 2
+sky = SubResource("Sky_kln2b")
+ambient_light_source = 3
+ssao_enabled = true
+ssil_enabled = true
+sdfgi_enabled = true
+sdfgi_use_occlusion = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_crouch_test"]
+albedo_color = Color(0.42, 0.31, 0.2, 1)
+roughness = 0.92
+
+[sub_resource type="BoxMesh" id="BoxMesh_crouch_roof"]
+size = Vector3(4, 0.4, 6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_crouch_roof"]
+size = Vector3(4, 0.4, 6)
+
+[sub_resource type="BoxMesh" id="BoxMesh_crouch_post"]
+size = Vector3(0.45, 2.4, 0.45)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_crouch_post"]
+size = Vector3(0.45, 2.4, 0.45)
+
+[node name="Main" type="Node3D" unique_id=2058610798]
+
+[node name="Player" parent="." unique_id=1776965245 instance=ExtResource("1_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15851903, 0)
+
+[node name="Ground" parent="." unique_id=873789979 instance=ExtResource("2_ground")]
+transform = Transform3D(20, 0, 0, 0, 20, 0, 0, 0, 20, 0, 0, 0)
+
+[node name="Bandit" parent="." unique_id=1903525500 instance=ExtResource("3_bandit")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0.2, -14)
+
+[node name="HUD" parent="." unique_id=762472150 instance=ExtResource("4_hud")]
+
+[node name="QuietSpot" type="Area3D" parent="." unique_id=1610326151]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0.1, 4)
+script = ExtResource("5_quiet_spot_script")
+
+[node name="Marker" type="MeshInstance3D" parent="QuietSpot" unique_id=660800128]
+material_override = SubResource("StandardMaterial3D_quiet_spot")
+mesh = SubResource("CylinderMesh_quiet_spot")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="QuietSpot" unique_id=1873788672]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CylinderShape3D_quiet_spot")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=2061927544]
+environment = SubResource("Environment_idj7w")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=204228707]
+transform = Transform3D(1, 0, 0, 0, 0.42861974, 0.903485, 0, -0.903485, 0.42861974, 0, 6.000542, 0)
+light_bake_mode = 1
+shadow_enabled = true
+
+[node name="CrouchTest" type="StaticBody3D" parent="." unique_id=39721058]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10)
+
+[node name="RoofMesh" type="MeshInstance3D" parent="CrouchTest" unique_id=2051492850]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.55, 0)
+material_override = SubResource("StandardMaterial3D_crouch_test")
+mesh = SubResource("BoxMesh_crouch_roof")
+
+[node name="RoofCollision" type="CollisionShape3D" parent="CrouchTest" unique_id=2078972704]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.55, 0)
+shape = SubResource("BoxShape3D_crouch_roof")
+
+[node name="LeftPostMesh" type="MeshInstance3D" parent="CrouchTest" unique_id=1643471781]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.75, 1.2, 0)
+material_override = SubResource("StandardMaterial3D_crouch_test")
+mesh = SubResource("BoxMesh_crouch_post")
+
+[node name="LeftPostCollision" type="CollisionShape3D" parent="CrouchTest" unique_id=2099769248]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.75, 1.2, 0)
+shape = SubResource("BoxShape3D_crouch_post")
+
+[node name="RightPostMesh" type="MeshInstance3D" parent="CrouchTest" unique_id=1417045254]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.75, 1.2, 0)
+material_override = SubResource("StandardMaterial3D_crouch_test")
+mesh = SubResource("BoxMesh_crouch_post")
+
+[node name="RightPostCollision" type="CollisionShape3D" parent="CrouchTest" unique_id=1079865269]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.75, 1.2, 0)
+shape = SubResource("BoxShape3D_crouch_post")
+
+[node name="CSGBox3D" type="CSGBox3D" parent="." unique_id=2017133492]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37.060722, 0.7128204, -0.80029297)
+size = Vector3(44.954224, 1.3867188, 2.600586)
+
+[node name="CSGBox3D2" type="CSGBox3D" parent="." unique_id=1073658221]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.4802618, 24.294407)
+size = Vector3(12, 5, 5)
+
+[node name="CSGCylinder3D" type="CSGCylinder3D" parent="." unique_id=390257678]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.247272, 7.234497, -22.045898)
+radius = 1.0
+height = 16.468994
+
+[node name="CSGCylinder3D" type="CSGCylinder3D" parent="CSGCylinder3D" unique_id=735342837]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.926441, 1.0747108, -9.858616)
+radius = 1.0
+height = 16.468994
+
+[node name="CSGCylinder3D2" type="CSGCylinder3D" parent="CSGCylinder3D" unique_id=1728428774]
+transform = Transform3D(0.9995154, 0.017617907, -0.025663074, -0.017989438, 0.9997356, -0.014318848, 0.025404017, 0.014773579, 0.9995681, 32.776855, 0.89143085, 8.562586)
+radius = 1.0
+height = 16.468994
+
+[node name="CSGCylinder3D3" type="CSGCylinder3D" parent="CSGCylinder3D" unique_id=1320029386]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.83705, 0.8541908, -11.163776)
+radius = 1.0
+height = 16.468994
+
+[node name="LightmapGI" type="LightmapGI" parent="." unique_id=1715559918]
+quality = 2

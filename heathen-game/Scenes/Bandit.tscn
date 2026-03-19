@@ -1,0 +1,77 @@
+[gd_scene format=3 uid="uid://dff4ucna2h1py"]
+
+[ext_resource type="Script" uid="uid://8eu1bbhs1xag" path="res://Scripts/Bandit.gd" id="1_bandit_script"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_bandit"]
+radius = 0.38
+height = 1.9
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bandit_body"]
+albedo_color = Color(0.22, 0.15, 0.11, 1)
+roughness = 0.93
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_bandit"]
+radius = 0.38
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_bandit_hurtbox"]
+radius = 0.48
+height = 1.25
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bandit_forward_marker"]
+albedo_color = Color(0.95, 0.2, 0.12, 1)
+emission_enabled = true
+emission = Color(0.95, 0.2, 0.12, 1)
+emission_energy_multiplier = 0.8
+
+[sub_resource type="BoxMesh" id="BoxMesh_bandit_forward_marker"]
+size = Vector3(0.16, 0.16, 0.34)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bandit_blade"]
+albedo_color = Color(0.73, 0.73, 0.77, 1)
+metallic = 0.35
+roughness = 0.25
+
+[sub_resource type="BoxMesh" id="BoxMesh_bandit_blade"]
+size = Vector3(0.08, 1.2, 0.16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_bandit_hitbox"]
+size = Vector3(0.36, 1.46, 0.48)
+
+[node name="Bandit" type="CharacterBody3D" unique_id=515753734]
+script = ExtResource("1_bandit_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1335577924]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0)
+shape = SubResource("CapsuleShape3D_bandit")
+
+[node name="BodyMesh" type="MeshInstance3D" parent="." unique_id=509653162]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0)
+material_override = SubResource("StandardMaterial3D_bandit_body")
+mesh = SubResource("CapsuleMesh_bandit")
+
+[node name="Hurtbox" type="Area3D" parent="." unique_id=325775955]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.02, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Hurtbox" unique_id=1317246248]
+shape = SubResource("CapsuleShape3D_bandit_hurtbox")
+
+[node name="ForwardMarker" type="MeshInstance3D" parent="." unique_id=1424989690]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.38, -0.52)
+material_override = SubResource("StandardMaterial3D_bandit_forward_marker")
+mesh = SubResource("BoxMesh_bandit_forward_marker")
+
+[node name="SwordPivot" type="Node3D" parent="." unique_id=99646568]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, 1, -0.02)
+
+[node name="BladeMarker" type="MeshInstance3D" parent="SwordPivot" unique_id=2026429426]
+transform = Transform3D(1, 0, 0, 0, 0.57357645, 0.81915206, 0, -0.81915206, 0.57357645, 0.18, 0.48, -0.24)
+rotation_order = 0
+material_override = SubResource("StandardMaterial3D_bandit_blade")
+mesh = SubResource("BoxMesh_bandit_blade")
+
+[node name="SwordHitbox" type="Area3D" parent="SwordPivot" unique_id=385382980]
+monitoring = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SwordPivot/SwordHitbox" unique_id=1444560247]
+transform = Transform3D(1, 0, 0, 0, 0.57357645, 0.81915206, 0, -0.81915206, 0.57357645, 0.18, 0.48, -0.24)
+shape = SubResource("BoxShape3D_bandit_hitbox")
