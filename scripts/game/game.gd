@@ -24,8 +24,8 @@ func _ready() -> void:
 	_set_status(level.get_current_status())
 	_set_health(player.get_health())
 	_set_prompt(level.get_current_prompt())
-	controls_label.text = "WASD move | Shift sprint | Space jump | C evade | LMB strike | Q omen pulse | E interact | Esc free mouse"
-	title_label.text = "HEATHEN // Escape Slice Prototype"
+	controls_label.text = "WASD move | Shift sprint | Space jump | C evade | LMB strike | Q omen or advanced rite | E interact | Esc free mouse"
+	title_label.text = "HEATHEN // Quiet Place Slice Prototype"
 
 func _ensure_input_map() -> void:
 	_set_key_action("move_forward", KEY_W)
@@ -77,5 +77,5 @@ func _set_prompt(text: String) -> void:
 	prompt_label.text = text
 
 func _on_level_completed() -> void:
-	_set_status("Escape route completed. Expand this benchmark with better stealth, village pressure, and shoreline atmosphere.")
-	_set_objective("Return to editor and iterate on woods tension, village traversal, and the boat getaway.")
+	_set_status("Quiet Place route completed. Expand this benchmark with stronger cabin atmosphere, village stealth pressure, and a sharper dock passage.")
+	_set_objective("Return to editor and iterate on the cabin ritual loop, village theft, and rite-assisted escape.")

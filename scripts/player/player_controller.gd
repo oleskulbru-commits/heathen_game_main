@@ -2,6 +2,7 @@ extends CharacterBody3D
 
 signal health_changed(current_health: float)
 signal status_changed(message: String)
+signal rite_state_changed(available: bool, active: bool)
 
 @export var move_speed: float = 5.0
 @export var sprint_multiplier: float = 1.55
@@ -19,6 +20,7 @@ signal status_changed(message: String)
 @export var omen_range: float = 16.0
 @export var omen_duration: float = 3.5
 @export var omen_cooldown: float = 5.0
+@export var advanced_rite_duration: float = 8.0
 @export var max_health: float = 100.0
 
 @onready var camera_pivot: Node3D = $CameraPivot
@@ -30,6 +32,9 @@ var _evade_timer: float = 0.0
 var _evade_cooldown_timer: float = 0.0
 var _attack_cooldown_timer: float = 0.0
 var _omen_cooldown_timer: float = 0.0
+var _advanced_rite_available: bool = false
+var _advanced_rite_active: bool = false
+var _advanced_rite_timer: float = 0.0
 
 func _ready() -> void:
 	_ensure_input_map()
@@ -38,7 +43,8 @@ func _ready() -> void:
 	add_to_group("player")
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	health_changed.emit(health)
-	status_changed.emit("Reach the torch-lit farm edge without getting pinned down.")
+	rite_state_changed.emit(_advanced_rite_available, _advanced_rite_active)
+	status_changed.emit("Gather what the rite needs, keep low, and find a way out by sea.")
 
 func _ensure_input_map() -> void:
 	_set_key_action("move_forward", KEY_W)
@@ -92,6 +98,12 @@ func _physics_process(delta: float) -> void:
 		_attack_cooldown_timer -= delta
 	if _omen_cooldown_timer > 0.0:
 		_omen_cooldown_timer -= delta
+	if _advanced_rite_timer > 0.0:
+		_advanced_rite_timer -= delta
+		if _advanced_rite_timer <= 0.0:
+			_advanced_rite_active = false
+			rite_state_changed.emit(_advanced_rite_available, _advanced_rite_active)
+			status_changed.emit("The veiling rite gutters out. You are exposed again.")
 
 	if not is_on_floor():
 		velocity += get_gravity() * gravity_scale * delta
@@ -99,7 +111,10 @@ func _physics_process(delta: float) -> void:
 		velocity.y = jump_velocity
 
 	if Input.is_action_just_pressed("curse_pulse"):
-		_cast_omen_pulse()
+		if _advanced_rite_available and not _advanced_rite_active:
+			_activate_advanced_rite()
+		else:
+			_cast_omen_pulse()
 	if Input.is_action_just_pressed("attack"):
 		_try_attack()
 
@@ -188,6 +203,44 @@ func _cast_omen_pulse() -> void:
 				revealable.reveal_from_omen(omen_duration)
 	status_changed.emit("Black breath rolls outward, marking danger through the fog.")
 
+func grant_advanced_rite() -> void:
+	_advanced_rite_available = true
+	_advanced_rite_active = false
+	_advanced_rite_timer = 0.0
+	rite_state_changed.emit(_advanced_rite_available, _advanced_rite_active)
+	status_changed.emit("The advanced rite is bound. Press Q to veil yourself and slip past the watcher.")
+
+func has_advanced_rite() -> bool:
+	return _advanced_rite_available
+
+func is_veiled() -> bool:
+	return _advanced_rite_active
+
+func rest_at_quiet_place(spawn_transform: Transform3D) -> void:
+	set_spawn_transform(spawn_transform)
+	velocity = Vector3.ZERO
+	health = max_health
+	health_changed.emit(health)
+	status_changed.emit("You rest inside the quiet place. Blood lines hold and the cabin remembers you.")
+
+func consume_advanced_rite() -> void:
+	_advanced_rite_available = false
+	_advanced_rite_active = false
+	_advanced_rite_timer = 0.0
+	rite_state_changed.emit(_advanced_rite_available, _advanced_rite_active)
+
+func _activate_advanced_rite() -> void:
+	if not _advanced_rite_available:
+		_cast_omen_pulse()
+		return
+	if _advanced_rite_active:
+		status_changed.emit("The advanced rite is already veiling you.")
+		return
+	_advanced_rite_active = true
+	_advanced_rite_timer = advanced_rite_duration
+	rite_state_changed.emit(_advanced_rite_available, _advanced_rite_active)
+	status_changed.emit("The advanced rite darkens the air around you. Move before it fades.")
+
 func _update_visual_facing() -> void:
 	var flat_velocity := Vector3(velocity.x, 0.0, velocity.z)
 	if flat_velocity.length() > 0.1:
@@ -211,4 +264,4 @@ func _respawn() -> void:
 	velocity = Vector3.ZERO
 	health = max_health
 	health_changed.emit(health)
-	status_changed.emit("You crawl back to shelter. Try the approach again.")
+	status_changed.emit("You crawl back to the last quiet shelter and force yourself up again.")

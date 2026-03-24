@@ -1,4 +1,4 @@
-[gd_scene load_steps=37 format=3]
+[gd_scene load_steps=43 format=3]
 
 [ext_resource type="Script" path="res://scripts/levels/fjord_slice.gd" id="1_level_script"]
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="2_player_scene"]
@@ -58,6 +58,30 @@ size = Vector3(6, 4, 6)
 [sub_resource type="BoxMesh" id="BoxMesh_hut"]
 size = Vector3(6, 4, 6)
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_cabin_wall"]
+size = Vector3(5.2, 2.8, 0.35)
+
+[sub_resource type="BoxMesh" id="BoxMesh_cabin_wall"]
+size = Vector3(5.2, 2.8, 0.35)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_cabin_side"]
+size = Vector3(0.35, 2.8, 5.2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_cabin_side"]
+size = Vector3(0.35, 2.8, 5.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_cabin_roof"]
+size = Vector3(5.8, 0.3, 5.8)
+
+[sub_resource type="BoxMesh" id="BoxMesh_cabin_roof"]
+size = Vector3(5.8, 0.3, 5.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_cabin_floor"]
+size = Vector3(5.0, 0.2, 5.0)
+
+[sub_resource type="BoxMesh" id="BoxMesh_cabin_floor"]
+size = Vector3(5.0, 0.2, 5.0)
+
 [sub_resource type="BoxShape3D" id="BoxShape3D_dock"]
 size = Vector3(10, 0.4, 4)
 
@@ -87,6 +111,9 @@ size = Vector3(0.82, 0.08, 0.58)
 
 [sub_resource type="BoxMesh" id="BoxMesh_boat_hull"]
 size = Vector3(2.8, 0.7, 1.2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_quiet_place"]
+size = Vector3(2.6, 0.05, 2.6)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ground"]
 albedo_color = Color(0.25, 0.26, 0.24, 1)
@@ -120,6 +147,17 @@ roughness = 1.0
 albedo_color = Color(0.29, 0.27, 0.22, 1)
 roughness = 1.0
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_blood"]
+albedo_color = Color(0.43, 0.08, 0.08, 1)
+roughness = 0.8
+emission_enabled = true
+emission = Color(0.3, 0.03, 0.03, 1)
+emission_energy_multiplier = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_relic"]
+albedo_color = Color(0.57, 0.53, 0.45, 1)
+roughness = 1.0
+
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sail"]
 albedo_color = Color(0.67, 0.63, 0.55, 1)
 roughness = 1.0
@@ -143,6 +181,9 @@ shadow_enabled = true
 
 [node name="StartMarker" type="Marker3D" parent="."]
 position = Vector3(-8.5, 1, 1.5)
+
+[node name="QuietPlaceMarker" type="Marker3D" parent="."]
+position = Vector3(33.5, 1.0, 8.0)
 
 [node name="Player" parent="." instance=ExtResource("2_player_scene")]
 position = Vector3(-8.5, 1, 1.5)
@@ -174,7 +215,7 @@ mesh = SubResource("BoxMesh_woods_mid")
 material_override = SubResource("StandardMaterial3D_ground")
 
 [node name="VillageApproach" type="StaticBody3D" parent="."]
-position = Vector3(46, -0.15, -1)
+position = Vector3(47, -0.15, 0.5)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="VillageApproach"]
 shape = SubResource("BoxShape3D_village_approach")
@@ -184,7 +225,7 @@ mesh = SubResource("BoxMesh_village_approach")
 material_override = SubResource("StandardMaterial3D_ground")
 
 [node name="VillageMain" type="StaticBody3D" parent="."]
-position = Vector3(63, -0.2, 1)
+position = Vector3(66, -0.2, 1.5)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="VillageMain"]
 shape = SubResource("BoxShape3D_village_main")
@@ -194,7 +235,7 @@ mesh = SubResource("BoxMesh_village_main")
 material_override = SubResource("StandardMaterial3D_ground")
 
 [node name="Shoreline" type="StaticBody3D" parent="."]
-position = Vector3(82, -0.25, 5)
+position = Vector3(88, -0.25, 7)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Shoreline"]
 shape = SubResource("BoxShape3D_shoreline")
@@ -204,7 +245,7 @@ mesh = SubResource("BoxMesh_shoreline")
 material_override = SubResource("StandardMaterial3D_ground")
 
 [node name="Dock" type="StaticBody3D" parent="."]
-position = Vector3(76.5, 0.05, 7.5)
+position = Vector3(87.5, 0.05, 8.5)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Dock"]
 shape = SubResource("BoxShape3D_dock")
@@ -234,7 +275,7 @@ mesh = SubResource("BoxMesh_cliff_wall")
 material_override = SubResource("StandardMaterial3D_rock")
 
 [node name="VillageHouseA" type="StaticBody3D" parent="."]
-position = Vector3(58, 1.4, -5.5)
+position = Vector3(60, 1.4, -6.0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="VillageHouseA"]
 shape = SubResource("BoxShape3D_hut")
@@ -244,7 +285,7 @@ mesh = SubResource("BoxMesh_hut")
 material_override = SubResource("StandardMaterial3D_hut")
 
 [node name="VillageHouseB" type="StaticBody3D" parent="."]
-position = Vector3(67, 1.4, 6)
+position = Vector3(70, 1.4, 6.8)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="VillageHouseB"]
 shape = SubResource("BoxShape3D_hut")
@@ -253,74 +294,203 @@ shape = SubResource("BoxShape3D_hut")
 mesh = SubResource("BoxMesh_hut")
 material_override = SubResource("StandardMaterial3D_hut")
 
+[node name="HuntingCabin" type="Node3D" parent="."]
+position = Vector3(33.5, 0.0, 8.0)
+
+[node name="CabinFloor" type="StaticBody3D" parent="HuntingCabin"]
+position = Vector3(0, 0.1, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HuntingCabin/CabinFloor"]
+shape = SubResource("BoxShape3D_cabin_floor")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HuntingCabin/CabinFloor"]
+mesh = SubResource("BoxMesh_cabin_floor")
+material_override = SubResource("StandardMaterial3D_wood")
+
+[node name="BackWall" type="StaticBody3D" parent="HuntingCabin"]
+position = Vector3(0, 1.4, -2.45)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HuntingCabin/BackWall"]
+shape = SubResource("BoxShape3D_cabin_wall")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HuntingCabin/BackWall"]
+mesh = SubResource("BoxMesh_cabin_wall")
+material_override = SubResource("StandardMaterial3D_hut")
+
+[node name="LeftWall" type="StaticBody3D" parent="HuntingCabin"]
+position = Vector3(-2.45, 1.4, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HuntingCabin/LeftWall"]
+shape = SubResource("BoxShape3D_cabin_side")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HuntingCabin/LeftWall"]
+mesh = SubResource("BoxMesh_cabin_side")
+material_override = SubResource("StandardMaterial3D_hut")
+
+[node name="RightWall" type="StaticBody3D" parent="HuntingCabin"]
+position = Vector3(2.45, 1.4, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HuntingCabin/RightWall"]
+shape = SubResource("BoxShape3D_cabin_side")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HuntingCabin/RightWall"]
+mesh = SubResource("BoxMesh_cabin_side")
+material_override = SubResource("StandardMaterial3D_hut")
+
+[node name="FrontLeftWall" type="StaticBody3D" parent="HuntingCabin"]
+position = Vector3(-1.65, 1.4, 2.45)
+scale = Vector3(0.37, 1.0, 1.0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HuntingCabin/FrontLeftWall"]
+shape = SubResource("BoxShape3D_cabin_wall")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HuntingCabin/FrontLeftWall"]
+mesh = SubResource("BoxMesh_cabin_wall")
+material_override = SubResource("StandardMaterial3D_hut")
+
+[node name="FrontRightWall" type="StaticBody3D" parent="HuntingCabin"]
+position = Vector3(1.65, 1.4, 2.45)
+scale = Vector3(0.37, 1.0, 1.0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HuntingCabin/FrontRightWall"]
+shape = SubResource("BoxShape3D_cabin_wall")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HuntingCabin/FrontRightWall"]
+mesh = SubResource("BoxMesh_cabin_wall")
+material_override = SubResource("StandardMaterial3D_hut")
+
+[node name="Roof" type="StaticBody3D" parent="HuntingCabin"]
+position = Vector3(0, 2.95, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HuntingCabin/Roof"]
+shape = SubResource("BoxShape3D_cabin_roof")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="HuntingCabin/Roof"]
+mesh = SubResource("BoxMesh_cabin_roof")
+material_override = SubResource("StandardMaterial3D_hut")
+
+[node name="QuietPlaceSigil" type="MeshInstance3D" parent="HuntingCabin"]
+mesh = SubResource("BoxMesh_quiet_place")
+material_override = SubResource("StandardMaterial3D_blood")
+position = Vector3(0, 0.14, -0.3)
+
+[node name="QuietPlaceLight" type="OmniLight3D" parent="."]
+position = Vector3(33.5, 1.6, 7.6)
+light_color = Color(0.68, 0.14, 0.14, 1)
+light_energy = 0.8
+omni_range = 6.0
+
+[node name="QuietPlaceArea" type="Area3D" parent="."]
+position = Vector3(33.5, 1.0, 8.0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="QuietPlaceArea"]
+shape = SubResource("BoxShape3D_pickup_area")
+
 [node name="VillageTorchA" type="OmniLight3D" parent="."]
-position = Vector3(56.5, 2.4, -3.6)
+position = Vector3(58.5, 2.4, -3.2)
 light_color = Color(0.95, 0.58, 0.28, 1)
 light_energy = 2.8
 omni_range = 10.0
 
 [node name="VillageTorchB" type="OmniLight3D" parent="."]
-position = Vector3(68.3, 2.4, 3.8)
+position = Vector3(71.0, 2.4, 4.5)
 light_color = Color(0.95, 0.58, 0.28, 1)
 light_energy = 2.8
 omni_range = 10.0
 
-[node name="FoodProp" type="MeshInstance3D" parent="."]
+[node name="RowanProp" type="MeshInstance3D" parent="."]
 mesh = SubResource("SphereMesh_tree_crown")
 material_override = SubResource("StandardMaterial3D_tree")
-position = Vector3(6.5, 0.35, -5.2)
+position = Vector3(8.0, 0.35, -6.5)
 scale = Vector3(0.18, 0.08, 0.18)
 
-[node name="FoodArea" type="Area3D" parent="."]
-position = Vector3(6.5, 1.0, -5.2)
+[node name="RowanArea" type="Area3D" parent="."]
+position = Vector3(8.0, 1.0, -6.5)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="FoodArea"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="RowanArea"]
 shape = SubResource("BoxShape3D_pickup_area")
 
-[node name="BandageProp" type="MeshInstance3D" parent="."]
+[node name="AshProp" type="MeshInstance3D" parent="."]
 mesh = SubResource("BoxMesh_cache_cloth")
 material_override = SubResource("StandardMaterial3D_bandage")
-position = Vector3(23.0, 0.6, 4.2)
+position = Vector3(18.0, 0.6, 5.0)
 scale = Vector3(1.05, 0.9, 0.9)
 
-[node name="BandageArea" type="Area3D" parent="."]
-position = Vector3(23.0, 1.0, 4.2)
+[node name="AshArea" type="Area3D" parent="."]
+position = Vector3(18.0, 1.0, 5.0)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="BandageArea"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AshArea"]
 shape = SubResource("BoxShape3D_pickup_area")
 
-[node name="OilCache" type="Node3D" parent="."]
-position = Vector3(35.0, 0.45, -6.8)
+[node name="TallowCache" type="Node3D" parent="."]
+position = Vector3(27.5, 0.45, -7.5)
 
-[node name="Crate" type="MeshInstance3D" parent="OilCache"]
+[node name="Crate" type="MeshInstance3D" parent="TallowCache"]
 mesh = SubResource("BoxMesh_cache_crate")
 material_override = SubResource("StandardMaterial3D_wood")
 
-[node name="Cloth" type="MeshInstance3D" parent="OilCache"]
+[node name="Cloth" type="MeshInstance3D" parent="TallowCache"]
 mesh = SubResource("BoxMesh_cache_cloth")
 material_override = SubResource("StandardMaterial3D_oil_cloth")
 position = Vector3(0.0, 0.28, 0.02)
 
-[node name="OilLight" type="OmniLight3D" parent="."]
-position = Vector3(35.0, 1.55, -6.8)
+[node name="TallowLight" type="OmniLight3D" parent="."]
+position = Vector3(27.5, 1.55, -7.5)
 light_color = Color(0.73, 0.26, 0.18, 1)
 light_energy = 1.6
 omni_range = 6.0
 
-[node name="OilArea" type="Area3D" parent="."]
-position = Vector3(35.0, 1.0, -6.8)
+[node name="TallowArea" type="Area3D" parent="."]
+position = Vector3(27.5, 1.0, -7.5)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="OilArea"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TallowArea"]
 shape = SubResource("BoxShape3D_pickup_area")
 
-[node name="VillageArea" type="Area3D" parent="."]
-position = Vector3(61.0, 1.0, 0.5)
+[node name="SilverCache" type="Node3D" parent="."]
+position = Vector3(58.5, 0.45, -2.4)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="VillageArea"]
-shape = SubResource("BoxShape3D_village_area")
+[node name="Crate" type="MeshInstance3D" parent="SilverCache"]
+mesh = SubResource("BoxMesh_cache_crate")
+material_override = SubResource("StandardMaterial3D_wood")
+
+[node name="Cloth" type="MeshInstance3D" parent="SilverCache"]
+mesh = SubResource("BoxMesh_cache_cloth")
+material_override = SubResource("StandardMaterial3D_relic")
+position = Vector3(0.0, 0.28, 0.02)
+
+[node name="SilverArea" type="Area3D" parent="."]
+position = Vector3(58.5, 1.0, -2.4)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SilverArea"]
+shape = SubResource("BoxShape3D_pickup_area")
+
+[node name="WaxProp" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_cache_cloth")
+material_override = SubResource("StandardMaterial3D_sail")
+position = Vector3(69.2, 0.55, -3.6)
+scale = Vector3(0.9, 1.1, 0.9)
+
+[node name="WaxArea" type="Area3D" parent="."]
+position = Vector3(69.2, 1.0, -3.6)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WaxArea"]
+shape = SubResource("BoxShape3D_pickup_area")
+
+[node name="BoneProp" type="MeshInstance3D" parent="."]
+mesh = SubResource("CylinderMesh_tree_trunk")
+material_override = SubResource("StandardMaterial3D_relic")
+position = Vector3(73.5, 0.8, 5.8)
+rotation = Vector3(1.2, 0.25, 0.0)
+scale = Vector3(0.35, 0.22, 0.35)
+
+[node name="BoneArea" type="Area3D" parent="."]
+position = Vector3(73.5, 1.0, 5.8)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="BoneArea"]
+shape = SubResource("BoxShape3D_pickup_area")
 
 [node name="Boat" type="Node3D" parent="."]
-position = Vector3(87.0, 0.45, 7.7)
+position = Vector3(96.0, 0.45, 9.2)
 
 [node name="Hull" type="MeshInstance3D" parent="Boat"]
 mesh = SubResource("BoxMesh_boat_hull")
@@ -340,30 +510,19 @@ rotation = Vector3(0, 0, 1.5708)
 scale = Vector3(2.8, 4.4, 0.25)
 
 [node name="BoatLight" type="OmniLight3D" parent="."]
-position = Vector3(87.0, 2.1, 7.7)
+position = Vector3(96.0, 2.1, 9.2)
 light_color = Color(0.74, 0.31, 0.22, 1)
 light_energy = 0.8
 omni_range = 7.0
 
 [node name="BoatArea" type="Area3D" parent="."]
-position = Vector3(87.0, 1.0, 7.7)
+position = Vector3(96.0, 1.0, 9.2)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="BoatArea"]
 shape = SubResource("BoxShape3D_pickup_area")
 
-[node name="Enforcer" parent="." instance=ExtResource("3_enemy_scene")]
-position = Vector3(52.0, 1.0, -2.6)
-
-[node name="PatrolPoints" parent="Enforcer" index="3"]
-
-[node name="PatrolA" parent="Enforcer/PatrolPoints" index="0"]
-position = Vector3(0, 0, 0)
-
-[node name="PatrolB" parent="Enforcer/PatrolPoints" index="1"]
-position = Vector3(6.2, 0, 2.0)
-
 [node name="VillageEnforcer" parent="." instance=ExtResource("3_enemy_scene")]
-position = Vector3(66.5, 1.0, 4.5)
+position = Vector3(63.5, 1.0, 1.6)
 
 [node name="PatrolPoints" parent="VillageEnforcer" index="3"]
 
@@ -371,7 +530,18 @@ position = Vector3(66.5, 1.0, 4.5)
 position = Vector3(0, 0, 0)
 
 [node name="PatrolB" parent="VillageEnforcer/PatrolPoints" index="1"]
-position = Vector3(-5.0, 0, -7.5)
+position = Vector3(7.0, 0, -5.0)
+
+[node name="FinalEnforcer" parent="." instance=ExtResource("3_enemy_scene")]
+position = Vector3(88.0, 1.0, 9.0)
+
+[node name="PatrolPoints" parent="FinalEnforcer" index="3"]
+
+[node name="PatrolA" parent="FinalEnforcer/PatrolPoints" index="0"]
+position = Vector3(0, 0, 0)
+
+[node name="PatrolB" parent="FinalEnforcer/PatrolPoints" index="1"]
+position = Vector3(-4.4, 0, -2.2)
 
 [node name="TreeA" type="Node3D" parent="."]
 position = Vector3(10.0, 0.0, -9.0)
@@ -447,6 +617,32 @@ material_override = SubResource("StandardMaterial3D_bark")
 position = Vector3(0, 1.8, 0)
 
 [node name="Crown" type="MeshInstance3D" parent="TreeF"]
+mesh = SubResource("SphereMesh_tree_crown")
+material_override = SubResource("StandardMaterial3D_tree")
+position = Vector3(0, 4.0, 0)
+
+[node name="TreeG" type="Node3D" parent="."]
+position = Vector3(28.0, 0.0, 11.5)
+
+[node name="Trunk" type="MeshInstance3D" parent="TreeG"]
+mesh = SubResource("CylinderMesh_tree_trunk")
+material_override = SubResource("StandardMaterial3D_bark")
+position = Vector3(0, 1.8, 0)
+
+[node name="Crown" type="MeshInstance3D" parent="TreeG"]
+mesh = SubResource("SphereMesh_tree_crown")
+material_override = SubResource("StandardMaterial3D_tree")
+position = Vector3(0, 4.0, 0)
+
+[node name="TreeH" type="Node3D" parent="."]
+position = Vector3(56.0, 0.0, 11.0)
+
+[node name="Trunk" type="MeshInstance3D" parent="TreeH"]
+mesh = SubResource("CylinderMesh_tree_trunk")
+material_override = SubResource("StandardMaterial3D_bark")
+position = Vector3(0, 1.8, 0)
+
+[node name="Crown" type="MeshInstance3D" parent="TreeH"]
 mesh = SubResource("SphereMesh_tree_crown")
 material_override = SubResource("StandardMaterial3D_tree")
 position = Vector3(0, 4.0, 0)

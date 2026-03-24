@@ -106,6 +106,9 @@ func _process_patrol(delta: float) -> void:
 		_patrol_index = (_patrol_index + 1) % _patrol_points.size()
 
 func _process_suspicious(delta: float) -> void:
+	if _player != null and _player.has_method("is_veiled") and _player.is_veiled():
+		_enter_search(_home_position)
+		return
 	if _can_detect_player() and _state_timer <= 0.0:
 		_set_state("chase", "The enforcer sees you and surges forward.")
 		_lost_sight_timer = suspicion_duration
@@ -123,6 +126,9 @@ func _process_suspicious(delta: float) -> void:
 func _process_chase(delta: float) -> void:
 	if _player == null:
 		_set_state("patrol")
+		return
+	if _player.has_method("is_veiled") and _player.is_veiled():
+		_enter_search(_home_position)
 		return
 	var player_position := _player.global_position
 	var distance := global_position.distance_to(player_position)
@@ -170,6 +176,8 @@ func _can_detect_player() -> bool:
 	var offset := _player.global_position - global_position
 	var flat_offset := Vector3(offset.x, 0.0, offset.z)
 	var distance := flat_offset.length()
+	if _player.has_method("is_veiled") and _player.is_veiled() and distance > 2.1:
+		return false
 	if distance > detection_range or distance <= 0.05:
 		return false
 	var forward := -global_transform.basis.z
