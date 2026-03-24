@@ -5,6 +5,8 @@ signal awareness_changed(state: String, message: String)
 @export var patrol_speed: float = 2.2
 @export var chase_speed: float = 4.1
 @export var detection_range: float = 13.0
+@export var detection_build_rate: float = 1.8
+@export var detection_decay_rate: float = 1.1
 @export var attack_range: float = 1.55
 @export var attack_cooldown: float = 1.15
 @export var suspicion_duration: float = 2.5
@@ -27,6 +29,7 @@ var _attack_cooldown_timer: float = 0.0
 var _lost_sight_timer: float = 0.0
 var _reveal_timer: float = 0.0
 var _state_timer: float = 0.0
+var _detection_progress: float = 0.0
 var _health: float = 0.0
 var _home_position: Vector3 = Vector3.ZERO
 var _last_known_player_position: Vector3 = Vector3.ZERO
@@ -34,6 +37,13 @@ var _body_material: StandardMaterial3D
 var _head_material: StandardMaterial3D
 var _indicator_material: StandardMaterial3D
 var _indicator_mesh: MeshInstance3D
+var _base_patrol_speed: float = 0.0
+var _base_chase_speed: float = 0.0
+var _base_detection_range: float = 0.0
+var _base_suspicion_duration: float = 0.0
+var _base_search_duration: float = 0.0
+var _base_leash_radius: float = 0.0
+var _alert_level: int = 0
 
 func _ready() -> void:
 	add_to_group("hostile")
@@ -45,6 +55,12 @@ func _ready() -> void:
 	_lost_sight_timer = suspicion_duration
 	_health = max_health
 	_home_position = global_position
+	_base_patrol_speed = patrol_speed
+	_base_chase_speed = chase_speed
+	_base_detection_range = detection_range
+	_base_suspicion_duration = suspicion_duration
+	_base_search_duration = search_duration
+	_base_leash_radius = leash_radius
 	_body_material = StandardMaterial3D.new()
 	_body_material.roughness = 1.0
 	_body_material.emission_enabled = true
@@ -83,7 +99,7 @@ func _physics_process(delta: float) -> void:
 	match _state:
 		"patrol":
 			_process_patrol(delta)
-			if _can_detect_player():
+			if _update_detection_progress(delta):
 				_enter_suspicion(_player.global_position, true)
 		"suspicious":
 			_process_suspicious(delta)
@@ -154,6 +170,7 @@ func _process_search(delta: float) -> void:
 		_set_state("chase", "You are exposed. The enforcer commits to the chase.")
 		_lost_sight_timer = suspicion_duration
 		return
+	_update_detection_progress(delta)
 	_move_toward(_clamp_to_leash(_last_known_player_position), patrol_speed * 1.05, delta)
 	_face_toward(_last_known_player_position)
 	if _state_timer <= 0.0:
@@ -176,9 +193,10 @@ func _can_detect_player() -> bool:
 	var offset := _player.global_position - global_position
 	var flat_offset := Vector3(offset.x, 0.0, offset.z)
 	var distance := flat_offset.length()
+	var effective_detection_range := _get_effective_detection_range()
 	if _player.has_method("is_veiled") and _player.is_veiled() and distance > 2.1:
 		return false
-	if distance > detection_range or distance <= 0.05:
+	if distance > effective_detection_range or distance <= 0.05:
 		return false
 	var forward := -global_transform.basis.z
 	forward.y = 0.0
@@ -199,11 +217,13 @@ func _enter_suspicion(target_position: Vector3, from_patrol: bool = false) -> vo
 	_last_known_player_position = _clamp_to_leash(target_position)
 	_lost_sight_timer = suspicion_duration
 	_state_timer = suspicion_pause_duration if from_patrol else 0.0
+	_detection_progress = 0.0
 
 func _enter_search(target_position: Vector3) -> void:
 	_set_state("search", "The enforcer searches where he last saw movement.")
 	_last_known_player_position = _clamp_to_leash(target_position)
 	_state_timer = search_duration
+	_detection_progress = 0.35
 
 func _clamp_to_leash(target_position: Vector3) -> Vector3:
 	var offset := target_position - _home_position
@@ -251,7 +271,9 @@ func _apply_state_visuals() -> void:
 	match _state:
 		"patrol":
 			_apply_tint(Color(0.5, 0.41, 0.3))
-			_set_indicator(Color(0.0, 0.0, 0.0, 0.0), false)
+			var visible := _detection_progress > 0.05
+			var indicator_color := Color(0.95, 0.74, 0.28, clampf(_detection_progress * 0.85, 0.0, 0.85))
+			_set_indicator(indicator_color, visible)
 		"suspicious":
 			_apply_tint(Color(0.72, 0.56, 0.26))
 			_set_indicator(Color(0.94, 0.72, 0.24), true)
@@ -266,10 +288,80 @@ func _set_state(new_state: String, message: String = "") -> void:
 	if _state == new_state:
 		return
 	_state = new_state
+	if new_state == "patrol":
+		_detection_progress = minf(_detection_progress, 0.25)
+	else:
+		_detection_progress = 0.0
 	if _reveal_timer <= 0.0:
 		_apply_state_visuals()
 	if message != "":
 		awareness_changed.emit(new_state, message)
+
+func set_alert_level(level: int) -> void:
+	_alert_level = clampi(level, 0, 2)
+	patrol_speed = _base_patrol_speed + (0.18 * _alert_level)
+	chase_speed = _base_chase_speed + (0.35 * _alert_level)
+	detection_range = _base_detection_range + (1.4 * _alert_level)
+	suspicion_duration = _base_suspicion_duration + (0.35 * _alert_level)
+	search_duration = _base_search_duration + (1.0 * _alert_level)
+	leash_radius = _base_leash_radius + (1.4 * _alert_level)
+	if _reveal_timer <= 0.0:
+		_apply_state_visuals()
+
+func investigate_position(target_position: Vector3, urgency: float = 0.55, message: String = "") -> void:
+	if _state == "chase":
+		return
+	_last_known_player_position = _clamp_to_leash(target_position)
+	_detection_progress = maxf(_detection_progress, urgency)
+	if urgency >= 0.85:
+		_set_state("suspicious", message if message != "" else "An enforcer stiffens and turns toward the disturbance.")
+		_lost_sight_timer = suspicion_duration
+		_state_timer = 0.0
+		return
+		
+	_set_state("search", message if message != "" else "An enforcer breaks formation and searches toward the sound.")
+	_state_timer = search_duration
+
+func _get_effective_detection_range() -> float:
+	return detection_range
+
+func _get_detection_exposure() -> float:
+	if _player == null:
+		return 0.0
+	var offset := _player.global_position - global_position
+	var flat_offset := Vector3(offset.x, 0.0, offset.z)
+	var distance := flat_offset.length()
+	var effective_detection_range := _get_effective_detection_range()
+	if distance <= 0.05 or distance > effective_detection_range:
+		return 0.0
+	if not _has_line_of_sight(_player.global_position + Vector3.UP):
+		return 0.0
+	var forward := -global_transform.basis.z
+	forward.y = 0.0
+	forward = forward.normalized()
+	var direction := flat_offset.normalized()
+	var facing := forward.dot(direction)
+	if facing < -0.35 and distance > 3.0:
+		return 0.0
+	var distance_factor := 1.0 - clampf(distance / effective_detection_range, 0.0, 1.0)
+	var facing_factor := clampf((facing + 0.45) / 1.45, 0.18, 1.0)
+	var movement_factor := 0.0
+	if _player is CharacterBody3D:
+		movement_factor = clampf((_player as CharacterBody3D).velocity.length() / 8.5, 0.0, 0.35)
+	var exposure := (0.35 + (distance_factor * 0.65) + movement_factor) * facing_factor
+	if _player.has_method("is_veiled") and _player.is_veiled():
+		exposure *= 0.22
+	return exposure
+
+func _update_detection_progress(delta: float) -> bool:
+	var exposure := _get_detection_exposure()
+	if exposure > 0.0:
+		_detection_progress = minf(1.0, _detection_progress + (exposure * detection_build_rate * delta))
+	else:
+		_detection_progress = maxf(0.0, _detection_progress - (detection_decay_rate * delta))
+	if _state == "patrol" and _reveal_timer <= 0.0:
+		_apply_state_visuals()
+	return _detection_progress >= 1.0
 
 func _create_awareness_indicator() -> void:
 	_indicator_material = StandardMaterial3D.new()

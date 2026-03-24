@@ -35,12 +35,14 @@ var _omen_cooldown_timer: float = 0.0
 var _advanced_rite_available: bool = false
 var _advanced_rite_active: bool = false
 var _advanced_rite_timer: float = 0.0
+var _visual_materials: Array[StandardMaterial3D] = []
 
 func _ready() -> void:
 	_ensure_input_map()
 	health = max_health
 	_spawn_transform = global_transform
 	add_to_group("player")
+	_cache_visual_materials()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	health_changed.emit(health)
 	rite_state_changed.emit(_advanced_rite_available, _advanced_rite_active)
@@ -102,6 +104,7 @@ func _physics_process(delta: float) -> void:
 		_advanced_rite_timer -= delta
 		if _advanced_rite_timer <= 0.0:
 			_advanced_rite_active = false
+			_apply_rite_visuals()
 			rite_state_changed.emit(_advanced_rite_available, _advanced_rite_active)
 			status_changed.emit("The veiling rite gutters out. You are exposed again.")
 
@@ -207,6 +210,7 @@ func grant_advanced_rite() -> void:
 	_advanced_rite_available = true
 	_advanced_rite_active = false
 	_advanced_rite_timer = 0.0
+	_apply_rite_visuals()
 	rite_state_changed.emit(_advanced_rite_available, _advanced_rite_active)
 	status_changed.emit("The advanced rite is bound. Press Q to veil yourself and slip past the watcher.")
 
@@ -227,6 +231,7 @@ func consume_advanced_rite() -> void:
 	_advanced_rite_available = false
 	_advanced_rite_active = false
 	_advanced_rite_timer = 0.0
+	_apply_rite_visuals()
 	rite_state_changed.emit(_advanced_rite_available, _advanced_rite_active)
 
 func _activate_advanced_rite() -> void:
@@ -238,6 +243,7 @@ func _activate_advanced_rite() -> void:
 		return
 	_advanced_rite_active = true
 	_advanced_rite_timer = advanced_rite_duration
+	_apply_rite_visuals()
 	rite_state_changed.emit(_advanced_rite_available, _advanced_rite_active)
 	status_changed.emit("The advanced rite darkens the air around you. Move before it fades.")
 
@@ -265,3 +271,31 @@ func _respawn() -> void:
 	health = max_health
 	health_changed.emit(health)
 	status_changed.emit("You crawl back to the last quiet shelter and force yourself up again.")
+
+func _cache_visual_materials() -> void:
+	_visual_materials.clear()
+	for child in visual_root.get_children():
+		if child is MeshInstance3D:
+			var mesh_instance := child as MeshInstance3D
+			var material := mesh_instance.material_override as StandardMaterial3D
+			if material == null:
+				continue
+			var unique_material := material.duplicate() as StandardMaterial3D
+			mesh_instance.material_override = unique_material
+			_visual_materials.append(unique_material)
+	_apply_rite_visuals()
+
+func _apply_rite_visuals() -> void:
+	for material in _visual_materials:
+		material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+		material.albedo_color.a = 1.0
+		material.emission_enabled = false
+		material.emission = Color.BLACK
+		material.emission_energy_multiplier = 0.0
+	if _advanced_rite_active:
+		for material in _visual_materials:
+			material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			material.albedo_color.a = 0.45
+			material.emission_enabled = true
+			material.emission = Color(0.22, 0.05, 0.04)
+			material.emission_energy_multiplier = 0.65

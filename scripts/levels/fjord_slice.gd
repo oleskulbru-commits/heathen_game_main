@@ -44,6 +44,7 @@ var _quiet_place_bound: bool = false
 var _advanced_rite_crafted: bool = false
 var _advanced_rite_spent: bool = false
 var _escaped: bool = false
+var _village_alert_level: int = 0
 
 func _ready() -> void:
 	player.set_spawn_transform(start_marker.global_transform)
@@ -80,6 +81,8 @@ func get_current_status() -> String:
 	if _all_village_components_gathered():
 		return "Return to the Quiet Place in the hunting cabin and bind the advanced rite."
 	if _quiet_place_bound and _all_woods_components_gathered():
+		if _village_alert_level > 0:
+			return "The village is stirring now. Stay off the open path, steal what you need, and get back to the cabin."
 		return "Enter the village and steal the advanced rite components without getting pinned down."
 	if _all_woods_components_gathered():
 		return "You have the first components. Step into the hunting cabin and bind the Quiet Place."
@@ -175,12 +178,16 @@ func _collect_village_component(component_id: String, prop: Node, message: Strin
 	if not _all_woods_components_gathered():
 		status_updated.emit("The first bindings are incomplete. Finish the woods gathering before stealing what completes the rite.")
 		return
+	var disturbance_origin := Vector3.ZERO
+	if prop is Node3D:
+		disturbance_origin = (prop as Node3D).global_position
 	_village_components[component_id] = true
 	if prop is MeshInstance3D:
 		prop.visible = false
 	else:
 		_set_visuals_visible(prop, false)
 	status_updated.emit(message)
+	_raise_village_alert(disturbance_origin)
 	_after_progress_change()
 
 func _use_quiet_place() -> void:
@@ -192,6 +199,7 @@ func _use_quiet_place() -> void:
 	elif _all_village_components_gathered() and not _advanced_rite_crafted:
 		_advanced_rite_crafted = true
 		player.grant_advanced_rite()
+		final_enforcer.investigate_position(boat_area.global_position, 0.8, "A hard voice carries from the dock. The watcher has shifted toward the shoreline.")
 		status_updated.emit("You bind the advanced rite inside the blood sign. It will veil you long enough to pass the watcher.")
 	_after_progress_change()
 
@@ -223,6 +231,22 @@ func _after_progress_change() -> void:
 		status_updated.emit("You have what the advanced rite needs. Return to the Quiet Place and bind it.")
 	elif _quiet_place_bound and _all_woods_components_gathered() and not _all_village_components_gathered():
 		status_updated.emit("The first binding holds. Move into the village and steal what completes the rite.")
+
+func _raise_village_alert(disturbance_origin: Vector3) -> void:
+	_village_alert_level = clampi(_village_alert_level + 1, 0, 2)
+	village_enforcer.set_alert_level(_village_alert_level)
+	final_enforcer.set_alert_level(mini(2, max(_village_alert_level, 1)))
+	var village_message := "A shutter knocks somewhere uphill. The village has started to stir."
+	var dock_message := "Voices drift across the fjord. The dock watcher is no longer at ease."
+	match _village_alert_level:
+		1:
+			village_enforcer.investigate_position(disturbance_origin, 0.7, village_message)
+			final_enforcer.investigate_position(boat_area.global_position, 0.45, dock_message)
+			status_updated.emit("The first theft carries. The village is on edge now.")
+		2:
+			village_enforcer.investigate_position(disturbance_origin, 0.95, "Boots grind on wet earth. Someone is actively hunting the missing relics.")
+			final_enforcer.investigate_position(boat_area.global_position, 0.8, "The dock watcher shifts his ground and watches the shoreline harder.")
+			status_updated.emit("The village is fully stirred. One more mistake will turn the whole shoreline against you.")
 
 func _all_woods_components_gathered() -> bool:
 	for gathered in _woods_components.values():
@@ -262,14 +286,23 @@ func _build_progress_text() -> String:
 	if _advanced_rite_spent:
 		return "Rite: spent | Boat ahead"
 	if _advanced_rite_crafted:
-		return "Rite: crafted | Press Q to veil"
+		return "Rite: crafted | Press Q to veil | %s" % _build_alert_text()
 	if _all_village_components_gathered():
-		return "Village theft: 3/3 | Return to cabin"
+		return "Village theft: 3/3 | Return to cabin | %s" % _build_alert_text()
 	if _quiet_place_bound and _all_woods_components_gathered():
-		return "Village theft: %d/3" % _count_gathered(_village_components)
+		return "Village theft: %d/3 | %s" % [_count_gathered(_village_components), _build_alert_text()]
 	if _all_woods_components_gathered():
 		return "Quiet Place: unbound"
 	return "Woods components: %d/3" % _count_gathered(_woods_components)
+
+func _build_alert_text() -> String:
+	match _village_alert_level:
+		0:
+			return "Alert: low"
+		1:
+			return "Alert: rising"
+		_:
+			return "Alert: hunting"
 
 func _build_prompt_text() -> String:
 	match _interaction_target:
