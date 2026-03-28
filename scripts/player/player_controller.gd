@@ -1,301 +1,265 @@
 extends CharacterBody3D
+## Player controller built around root-motion locomotion with Witcher 3-style
+## orbit camera.  The camera orbits freely around the player via mouse; WASD
+## movement is relative to the camera.  The visual mesh rotates to face the
+## movement direction independently of the camera.
 
-signal health_changed(current_health: float)
-signal status_changed(message: String)
-signal rite_state_changed(available: bool, active: bool)
-
-@export var move_speed: float = 5.0
-@export var sprint_multiplier: float = 1.55
-@export var acceleration: float = 18.0
-@export var gravity_scale: float = 1.35
-@export var jump_velocity: float = 5.6
+# ── Exports ──────────────────────────────────────────────────────────────────
 @export var mouse_sensitivity: float = 0.0025
-@export var evade_speed: float = 11.5
-@export var evade_duration: float = 0.22
-@export var evade_cooldown: float = 0.95
-@export var attack_range: float = 2.1
-@export var attack_angle_degrees: float = 60.0
-@export var attack_cooldown: float = 0.55
-@export var attack_damage: float = 1.0
-@export var omen_range: float = 16.0
-@export var omen_duration: float = 3.5
-@export var omen_cooldown: float = 5.0
-@export var advanced_rite_duration: float = 8.0
-@export var max_health: float = 100.0
+@export var gravity_scale: float = 1.35
+@export var rotation_speed: float = 10.0
+@export var head_track_speed: float = 4.5
+@export var head_max_yaw_deg: float = 70.0
+@export var head_max_pitch_deg: float = 25.0
+@export var head_idle_weight: float = 0.55
+@export var head_move_weight: float = 0.12
 
+# ── Node references ──────────────────────────────────────────────────────────
 @onready var camera_pivot: Node3D = $CameraPivot
-@onready var visual_root: Node3D = $Visuals
+@onready var visual_root: Node3D = $xbot_root
+@onready var anim_tree: AnimationTree = $xbot_root/AnimationTree
+@onready var _skeleton: Skeleton3D = $xbot_root/Armature/Skeleton3D
 
-var health: float = 100.0
-var _spawn_transform: Transform3D
-var _evade_timer: float = 0.0
-var _evade_cooldown_timer: float = 0.0
-var _attack_cooldown_timer: float = 0.0
-var _omen_cooldown_timer: float = 0.0
-var _advanced_rite_available: bool = false
-var _advanced_rite_active: bool = false
-var _advanced_rite_timer: float = 0.0
-var _visual_materials: Array[StandardMaterial3D] = []
+# ── Camera state ─────────────────────────────────────────────────────────────
+var _cam_yaw: float = 0.0
+var _cam_pitch: float = 0.0
+
+# ── Head look state ──────────────────────────────────────────────────────────
+var _look_chain: Array = []  # [{idx, yaw_frac, pitch_frac}]
+var _head_look_current: Vector2 = Vector2.ZERO  # x = pitch, y = yaw (radians)
+var _look_weight: float = 0.0
+
+# ── Player mode ──────────────────────────────────────────────────────────────
+enum PlayerMode { TRAVERSAL, STEALTH }
+var _mode: PlayerMode = PlayerMode.TRAVERSAL
+
+# ── Lifecycle ────────────────────────────────────────────────────────────────
 
 func _ready() -> void:
 	_ensure_input_map()
-	health = max_health
-	_spawn_transform = global_transform
-	add_to_group("player")
-	_cache_visual_materials()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	health_changed.emit(health)
-	rite_state_changed.emit(_advanced_rite_available, _advanced_rite_active)
-	status_changed.emit("Gather what the rite needs, keep low, and find a way out by sea.")
-
-func _ensure_input_map() -> void:
-	_set_key_action("move_forward", KEY_W)
-	_set_key_action("move_back", KEY_S)
-	_set_key_action("move_left", KEY_A)
-	_set_key_action("move_right", KEY_D)
-	_set_key_action("sprint", KEY_SHIFT)
-	_set_key_action("jump", KEY_SPACE)
-	_set_key_action("evade", KEY_C)
-	_set_key_action("curse_pulse", KEY_Q)
-	_set_key_action("interact", KEY_E)
-	_set_key_action("ui_cancel", KEY_ESCAPE)
-	_ensure_mouse_action("attack", MOUSE_BUTTON_LEFT)
-
-func _set_key_action(action: StringName, keycode: Key) -> void:
-	if not InputMap.has_action(action):
-		InputMap.add_action(action)
-	for event in InputMap.action_get_events(action):
-		if event is InputEventKey:
-			InputMap.action_erase_event(action, event)
-	var key_event := InputEventKey.new()
-	key_event.physical_keycode = keycode
-	key_event.keycode = keycode
-	InputMap.action_add_event(action, key_event)
-
-func _ensure_mouse_action(action: StringName, button_index: MouseButton) -> void:
-	if not InputMap.has_action(action):
-		InputMap.add_action(action)
-	for event in InputMap.action_get_events(action):
-		if event is InputEventMouseButton and event.button_index == button_index:
-			return
-	var mouse_event := InputEventMouseButton.new()
-	mouse_event.button_index = button_index
-	InputMap.action_add_event(action, mouse_event)
+	anim_tree.active = true
+	_init_look_chain()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		rotate_y(-event.relative.x * mouse_sensitivity)
-		camera_pivot.rotate_x(-event.relative.y * mouse_sensitivity)
-		camera_pivot.rotation.x = clamp(camera_pivot.rotation.x, deg_to_rad(-60.0), deg_to_rad(35.0))
+		_cam_yaw -= event.relative.x * mouse_sensitivity
+		_cam_pitch -= event.relative.y * mouse_sensitivity
+		_cam_pitch = clampf(_cam_pitch, deg_to_rad(-60.0), deg_to_rad(35.0))
+		camera_pivot.rotation = Vector3(_cam_pitch, _cam_yaw, 0.0)
 	if event.is_action_pressed("ui_cancel"):
-		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-		else:
-			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED
+	if event.is_action_pressed("crouch"):
+		_toggle_crouch()
 
 func _physics_process(delta: float) -> void:
-	if _evade_cooldown_timer > 0.0:
-		_evade_cooldown_timer -= delta
-	if _attack_cooldown_timer > 0.0:
-		_attack_cooldown_timer -= delta
-	if _omen_cooldown_timer > 0.0:
-		_omen_cooldown_timer -= delta
-	if _advanced_rite_timer > 0.0:
-		_advanced_rite_timer -= delta
-		if _advanced_rite_timer <= 0.0:
-			_advanced_rite_active = false
-			_apply_rite_visuals()
-			rite_state_changed.emit(_advanced_rite_available, _advanced_rite_active)
-			status_changed.emit("The veiling rite gutters out. You are exposed again.")
-
+	# ── Gravity ──────────────────────────────────────────────────────────
 	if not is_on_floor():
 		velocity += get_gravity() * gravity_scale * delta
-	elif Input.is_action_just_pressed("jump"):
-		velocity.y = jump_velocity
 
-	if Input.is_action_just_pressed("curse_pulse"):
-		if _advanced_rite_available and not _advanced_rite_active:
-			_activate_advanced_rite()
-		else:
-			_cast_omen_pulse()
-	if Input.is_action_just_pressed("attack"):
-		_try_attack()
+	# ── Input → world-space move direction (relative to camera) ──────────
+	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	var cam_basis := camera_pivot.global_transform.basis
+	var cam_forward := -cam_basis.z
+	cam_forward.y = 0.0
+	cam_forward = cam_forward.normalized()
+	var cam_right := cam_basis.x
+	cam_right.y = 0.0
+	cam_right = cam_right.normalized()
 
-	if _evade_timer > 0.0:
-		_evade_timer -= delta
-		move_and_slide()
-		_update_visual_facing()
-		return
+	var move_dir := (cam_right * input.x + cam_forward * -input.y)
+	if move_dir.length_squared() > 1.0:
+		move_dir = move_dir.normalized()
 
-	var input_vector := Input.get_vector("move_left", "move_right", "move_back", "move_forward")
-	var forward := -global_transform.basis.z
-	forward.y = 0.0
-	forward = forward.normalized()
-	var right := global_transform.basis.x
-	right.y = 0.0
-	right = right.normalized()
-	var move_direction := (right * input_vector.x) + (forward * input_vector.y)
-	if move_direction.length() > 1.0:
-		move_direction = move_direction.normalized()
+	var is_moving := move_dir.length() > 0.1
+	var is_sprinting := is_moving and Input.is_action_pressed("sprint")
 
-	if Input.is_action_just_pressed("evade"):
-		_try_evade(move_direction, forward)
+	# ── Sprint exits stealth ────────────────────────────────────────────
+	if is_sprinting and _mode == PlayerMode.STEALTH:
+		_set_mode(PlayerMode.TRAVERSAL)
 
-	var target_speed := move_speed
-	if Input.is_action_pressed("sprint") and move_direction.length() > 0.1:
-		target_speed *= sprint_multiplier
-	var target_velocity := move_direction * target_speed
-	var horizontal_velocity := Vector3(velocity.x, 0.0, velocity.z)
-	horizontal_velocity = horizontal_velocity.move_toward(target_velocity, acceleration * delta)
-	velocity.x = horizontal_velocity.x
-	velocity.z = horizontal_velocity.z
+	# ── Update animation state machine ───────────────────────────────────
+	_update_animation(is_moving, is_sprinting)
+
+	# ── Rotate visual mesh toward move direction ─────────────────────────
+	if is_moving:
+		_face_direction(move_dir, delta)
+
+	# ── Apply root motion ────────────────────────────────────────────────
+	_apply_root_motion(delta)
 
 	move_and_slide()
-	_update_visual_facing()
 
-func _try_evade(move_direction: Vector3, fallback_forward: Vector3) -> void:
-	if _evade_cooldown_timer > 0.0:
-		return
-	var evade_direction := move_direction
-	if evade_direction.length() < 0.1:
-		evade_direction = fallback_forward
-	velocity.x = evade_direction.x * evade_speed
-	velocity.z = evade_direction.z * evade_speed
-	_evade_timer = evade_duration
-	_evade_cooldown_timer = evade_cooldown
-	status_changed.emit("You slip sideways across the wet ground.")
+# ── Head look-at ─────────────────────────────────────────────────────────────
 
-func _try_attack() -> void:
-	if _attack_cooldown_timer > 0.0:
+func _init_look_chain() -> void:
+	# Candidates: [bone_names_to_try, yaw_share, pitch_share]
+	# Shares are normalised later so missing bones don't break the split.
+	var candidates := [
+		[["spine.002", "Spine2", "spine_02", "chest"],  0.12, 0.10],
+		[["neck",      "Neck",   "neck_01"],              0.33, 0.35],
+		[["head",      "Head"],                             0.55, 0.55],
+	]
+	_look_chain.clear()
+	var total_yaw := 0.0
+	var total_pitch := 0.0
+	for entry in candidates:
+		var idx := -1
+		for bone_name in entry[0]:
+			idx = _skeleton.find_bone(bone_name)
+			if idx >= 0:
+				break
+		if idx >= 0:
+			_look_chain.append({"idx": idx, "yaw_frac": entry[1], "pitch_frac": entry[2]})
+			total_yaw += entry[1]
+			total_pitch += entry[2]
+	# Normalise so fractions always sum to 1.0
+	if total_yaw > 0.0:
+		for e in _look_chain:
+			e.yaw_frac /= total_yaw
+			e.pitch_frac /= total_pitch
+
+func _process(delta: float) -> void:
+	_apply_head_look(delta)
+
+func _apply_head_look(delta: float) -> void:
+	if _look_chain.is_empty():
 		return
-	_attack_cooldown_timer = attack_cooldown
-	var forward := -global_transform.basis.z
-	forward.y = 0.0
-	forward = forward.normalized()
-	var best_target: Node3D = null
-	var best_distance := attack_range
-	for candidate in get_tree().get_nodes_in_group("hostile"):
-		var candidate_node := candidate as Node3D
-		if candidate_node == null:
-			continue
-		var offset: Vector3 = candidate_node.global_position - global_position
-		var flat_offset := Vector3(offset.x, 0.0, offset.z)
-		var distance := flat_offset.length()
-		if distance > attack_range or distance <= 0.01:
-			continue
-		var angle := rad_to_deg(acos(clampf(forward.dot(flat_offset.normalized()), -1.0, 1.0)))
-		if angle > attack_angle_degrees:
-			continue
-		if distance < best_distance:
-			best_distance = distance
-			best_target = candidate_node
-	if best_target != null and best_target.has_method("take_damage"):
-		best_target.take_damage(attack_damage)
-		status_changed.emit("You lash out to keep the hunter off balance.")
+
+	# ── Target angles: offset between camera look dir and character facing ──
+	var cam_fwd := -camera_pivot.global_transform.basis.z
+	var char_fwd := -visual_root.global_transform.basis.z
+
+	# Horizontal yaw – signed angle from character forward to camera forward
+	var cam_h := Vector3(cam_fwd.x, 0.0, cam_fwd.z)
+	var char_h := Vector3(char_fwd.x, 0.0, char_fwd.z)
+	if cam_h.length_squared() < 0.001 or char_h.length_squared() < 0.001:
+		return
+	cam_h = cam_h.normalized()
+	char_h = char_h.normalized()
+	var target_yaw := cam_h.signed_angle_to(char_h, Vector3.UP)
+
+	# Vertical pitch – how far the camera looks above/below horizontal
+	var target_pitch := -asin(clampf(cam_fwd.y, -1.0, 1.0))
+
+	# Clamp to comfortable range
+	var max_yaw := deg_to_rad(head_max_yaw_deg)
+	var max_pitch := deg_to_rad(head_max_pitch_deg)
+	target_yaw = clampf(target_yaw, -max_yaw, max_yaw)
+	target_pitch = clampf(target_pitch, -max_pitch, max_pitch)
+
+	# ── Movement dampening – body already faces move dir, reduce tracking ──
+	var input_len := Input.get_vector(
+		"move_left", "move_right", "move_forward", "move_back").length()
+	var target_w := lerpf(head_idle_weight, head_move_weight,
+		clampf(input_len * 2.0, 0.0, 1.0))
+	_look_weight = lerpf(_look_weight, target_w, clampf(3.0 * delta, 0.0, 1.0))
+
+	# Weighted targets
+	var w_yaw := target_yaw * _look_weight
+	var w_pitch := target_pitch * _look_weight
+
+	# ── Smooth interpolation ────────────────────────────────────────────────
+	var t := clampf(head_track_speed * delta, 0.0, 1.0)
+	_head_look_current.y = lerp_angle(_head_look_current.y, w_yaw, t)
+	_head_look_current.x = lerp_angle(_head_look_current.x, w_pitch, t)
+
+	# ── Distribute across the bone chain ────────────────────────────────────
+	# Step 1: Clear all overrides so we read the clean animated poses.
+	for entry in _look_chain:
+		_skeleton.set_bone_global_pose_override(entry.idx, Transform3D.IDENTITY, 0.0, true)
+
+	# Step 2: Read clean animated poses, then apply our rotation on top.
+	for entry in _look_chain:
+		var bone_yaw: float = _head_look_current.y * entry.yaw_frac
+		var bone_pitch: float = _head_look_current.x * entry.pitch_frac
+		var bone_pose := _skeleton.get_bone_global_pose(entry.idx)
+		# Pre-multiply so rotation happens in skeleton (≈ character) space,
+		# independent of each bone's rest orientation.
+		var extra := Basis(Vector3.UP, bone_yaw) * Basis(Vector3.RIGHT, bone_pitch)
+		var modified := bone_pose
+		modified.basis = extra * bone_pose.basis
+		_skeleton.set_bone_global_pose_override(entry.idx, modified, 1.0, true)
+
+# ── Animation ────────────────────────────────────────────────────────────────
+
+var _was_moving := false
+
+func _update_animation(is_moving: bool, is_sprinting: bool) -> void:
+	anim_tree.set("parameters/conditions/is_moving", is_moving)
+	anim_tree.set("parameters/conditions/is_stopping", _was_moving and not is_moving)
+
+	if _mode == PlayerMode.STEALTH:
+		anim_tree.set("parameters/CrouchLocomotion/blend_position",
+			1.0 if is_moving else 0.0)
 	else:
-		status_changed.emit("Your strike cuts only fog and air.")
+		if is_moving:
+			var blend := 2.0 if is_sprinting else 1.0
+			anim_tree.set("parameters/Locomotion/blend_position", blend)
 
-func _cast_omen_pulse() -> void:
-	if _omen_cooldown_timer > 0.0:
-		status_changed.emit("The omen still clings to the air. Wait.")
+	_was_moving = is_moving
+
+# ── Mode switching ───────────────────────────────────────────────────────────
+
+func _toggle_crouch() -> void:
+	if _mode == PlayerMode.TRAVERSAL:
+		_set_mode(PlayerMode.STEALTH)
+	else:
+		_set_mode(PlayerMode.TRAVERSAL)
+
+func _set_mode(new_mode: PlayerMode) -> void:
+	if new_mode == _mode:
 		return
-	_omen_cooldown_timer = omen_cooldown
-	for revealable in get_tree().get_nodes_in_group("omen_revealable"):
-		if revealable is Node3D and revealable.global_position.distance_to(global_position) <= omen_range:
-			if revealable.has_method("reveal_from_omen"):
-				revealable.reveal_from_omen(omen_duration)
-	status_changed.emit("Black breath rolls outward, marking danger through the fog.")
+	_mode = new_mode
+	var playback: AnimationNodeStateMachinePlayback = anim_tree["parameters/playback"]
+	var current := playback.get_current_node()
+	if _mode == PlayerMode.STEALTH:
+		if current == &"Locomotion":
+			playback.travel("CrouchLocomotion")
+		else:
+			playback.travel("CrouchIdle")
+	else:
+		if current == &"CrouchLocomotion":
+			playback.travel("Locomotion")
+		else:
+			playback.travel("Idle")
 
-func grant_advanced_rite() -> void:
-	_advanced_rite_available = true
-	_advanced_rite_active = false
-	_advanced_rite_timer = 0.0
-	_apply_rite_visuals()
-	rite_state_changed.emit(_advanced_rite_available, _advanced_rite_active)
-	status_changed.emit("The advanced rite is bound. Press Q to veil yourself and slip past the watcher.")
+# ── Facing ───────────────────────────────────────────────────────────────────
 
-func has_advanced_rite() -> bool:
-	return _advanced_rite_available
+func _face_direction(dir: Vector3, delta: float) -> void:
+	var target_angle := atan2(dir.x, dir.z)
+	var current_angle := visual_root.rotation.y
+	visual_root.rotation.y = lerp_angle(current_angle, target_angle, clampf(rotation_speed * delta, 0.0, 1.0))
 
-func is_veiled() -> bool:
-	return _advanced_rite_active
+# ── Root Motion ──────────────────────────────────────────────────────────────
 
-func rest_at_quiet_place(spawn_transform: Transform3D) -> void:
-	set_spawn_transform(spawn_transform)
-	velocity = Vector3.ZERO
-	health = max_health
-	health_changed.emit(health)
-	status_changed.emit("You rest inside the quiet place. Blood lines hold and the cabin remembers you.")
+func _apply_root_motion(delta: float) -> void:
+	var root_motion := anim_tree.get_root_motion_position()
+	# Transform from the visual mesh's local space → world space
+	root_motion = visual_root.global_transform.basis * root_motion
+	# Root motion is a per-frame displacement; convert to velocity
+	if delta > 0.0:
+		velocity.x = root_motion.x / delta
+		velocity.z = root_motion.z / delta
 
-func consume_advanced_rite() -> void:
-	_advanced_rite_available = false
-	_advanced_rite_active = false
-	_advanced_rite_timer = 0.0
-	_apply_rite_visuals()
-	rite_state_changed.emit(_advanced_rite_available, _advanced_rite_active)
+# ── Input Map ────────────────────────────────────────────────────────────────
 
-func _activate_advanced_rite() -> void:
-	if not _advanced_rite_available:
-		_cast_omen_pulse()
-		return
-	if _advanced_rite_active:
-		status_changed.emit("The advanced rite is already veiling you.")
-		return
-	_advanced_rite_active = true
-	_advanced_rite_timer = advanced_rite_duration
-	_apply_rite_visuals()
-	rite_state_changed.emit(_advanced_rite_available, _advanced_rite_active)
-	status_changed.emit("The advanced rite darkens the air around you. Move before it fades.")
+func _ensure_input_map() -> void:
+	_bind_key("move_forward", KEY_W)
+	_bind_key("move_back", KEY_S)
+	_bind_key("move_left", KEY_A)
+	_bind_key("move_right", KEY_D)
+	_bind_key("sprint", KEY_SHIFT)
+	_bind_key("crouch", KEY_CTRL)
+	_bind_key("ui_cancel", KEY_ESCAPE)
 
-func _update_visual_facing() -> void:
-	var flat_velocity := Vector3(velocity.x, 0.0, velocity.z)
-	if flat_velocity.length() > 0.1:
-		visual_root.look_at(global_position + flat_velocity, Vector3.UP)
-
-func take_damage(amount: float, _source_position: Vector3 = Vector3.ZERO) -> void:
-	health = maxf(0.0, health - amount)
-	health_changed.emit(health)
-	status_changed.emit("Pain blooms fast. Another mistake will kill you.")
-	if health <= 0.0:
-		_respawn()
-
-func set_spawn_transform(spawn_transform: Transform3D) -> void:
-	_spawn_transform = spawn_transform
-
-func get_health() -> float:
-	return health
-
-func _respawn() -> void:
-	global_transform = _spawn_transform
-	velocity = Vector3.ZERO
-	health = max_health
-	health_changed.emit(health)
-	status_changed.emit("You crawl back to the last quiet shelter and force yourself up again.")
-
-func _cache_visual_materials() -> void:
-	_visual_materials.clear()
-	for child in visual_root.get_children():
-		if child is MeshInstance3D:
-			var mesh_instance := child as MeshInstance3D
-			var material := mesh_instance.material_override as StandardMaterial3D
-			if material == null:
-				continue
-			var unique_material := material.duplicate() as StandardMaterial3D
-			mesh_instance.material_override = unique_material
-			_visual_materials.append(unique_material)
-	_apply_rite_visuals()
-
-func _apply_rite_visuals() -> void:
-	for material in _visual_materials:
-		material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
-		material.albedo_color.a = 1.0
-		material.emission_enabled = false
-		material.emission = Color.BLACK
-		material.emission_energy_multiplier = 0.0
-	if _advanced_rite_active:
-		for material in _visual_materials:
-			material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			material.albedo_color.a = 0.45
-			material.emission_enabled = true
-			material.emission = Color(0.22, 0.05, 0.04)
-			material.emission_energy_multiplier = 0.65
+func _bind_key(action: StringName, keycode: Key) -> void:
+	if not InputMap.has_action(action):
+		InputMap.add_action(action)
+	for evt in InputMap.action_get_events(action):
+		if evt is InputEventKey:
+			InputMap.action_erase_event(action, evt)
+	var key := InputEventKey.new()
+	key.physical_keycode = keycode
+	key.keycode = keycode
+	InputMap.action_add_event(action, key)
