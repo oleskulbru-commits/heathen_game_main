@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://bp3a0degmc061"]
 
 [ext_resource type="PackedScene" uid="uid://c60hntfmyew8k" path="res://assets/xbots/xbot_root.glb" id="1_xbot_glb"]
-[ext_resource type="AnimationLibrary" uid="uid://wbcssgi8bagd" path="res://scenes/xbots/player_movement.res" id="2_d65bf"]
+[ext_resource type="AnimationLibrary" uid="uid://wbcssgi8bagd" path="res://assets/animations/animation_libraries/player_movement.res" id="2_d65bf"]
 [ext_resource type="Script" uid="uid://ckggu0tcsecpj" path="res://scripts/xbots/xbot_animation_library.gd" id="3_qt2e2"]
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_crouch_idle"]

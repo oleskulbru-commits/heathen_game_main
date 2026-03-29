@@ -1,0 +1,46 @@
+[gd_scene format=3]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_body"]
+top_radius = 0.35
+bottom_radius = 0.35
+height = 0.03
+radial_segments = 24
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_body"]
+albedo_color = Color(0.35, 0.22, 0.1, 1)
+roughness = 0.75
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_boss"]
+top_radius = 0.08
+bottom_radius = 0.1
+height = 0.06
+radial_segments = 16
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_boss"]
+albedo_color = Color(0.6, 0.58, 0.5, 1)
+metallic = 0.8
+roughness = 0.3
+
+[sub_resource type="BoxMesh" id="BoxMesh_grip"]
+size = Vector3(0.28, 0.035, 0.035)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_grip"]
+albedo_color = Color(0.25, 0.15, 0.08, 1)
+roughness = 0.8
+
+[node name="Shield" type="Node3D"]
+
+[node name="Body" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0)
+mesh = SubResource("CylinderMesh_body")
+surface_material_override/0 = SubResource("StandardMaterial3D_body")
+
+[node name="Boss" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0.02)
+mesh = SubResource("CylinderMesh_boss")
+surface_material_override/0 = SubResource("StandardMaterial3D_boss")
+
+[node name="Grip" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.02)
+mesh = SubResource("BoxMesh_grip")
+surface_material_override/0 = SubResource("StandardMaterial3D_grip")

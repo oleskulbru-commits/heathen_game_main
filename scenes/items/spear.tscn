@@ -1,0 +1,30 @@
+[gd_scene format=3]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_shaft"]
+top_radius = 0.018
+bottom_radius = 0.02
+height = 1.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shaft"]
+albedo_color = Color(0.3, 0.18, 0.08, 1)
+roughness = 0.85
+
+[sub_resource type="BoxMesh" id="BoxMesh_head"]
+size = Vector3(0.04, 0.25, 0.01)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_head"]
+albedo_color = Color(0.7, 0.72, 0.75, 1)
+metallic = 0.9
+roughness = 0.2
+
+[node name="Spear" type="Node3D"]
+
+[node name="Shaft" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_shaft")
+surface_material_override/0 = SubResource("StandardMaterial3D_shaft")
+
+[node name="Head" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.02, 0)
+mesh = SubResource("BoxMesh_head")
+surface_material_override/0 = SubResource("StandardMaterial3D_head")

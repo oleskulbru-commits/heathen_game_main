@@ -5,8 +5,18 @@
 [ext_resource type="Script" uid="uid://cib2rig7vup10" path="res://addons/terrain_3d/tools/importer.gd" id="3_sugp2"]
 [ext_resource type="PackedScene" uid="uid://c6a7kqmwiipkx" path="res://scenes/enemies/bandit.tscn" id="4_jyhfs"]
 [ext_resource type="Script" uid="uid://cqb3aydmasiy" path="res://scripts/game/terrain_foliage.gd" id="5_foliage"]
-[ext_resource type="PackedScene" uid="uid://5d6mtiwqxrt7" path="res://scenes/levels/frafjord.tscn" id="5_o6xl0"]
+[ext_resource type="PackedScene" path="res://assets/level/placeholders/path_segment.tscn" id="6_jbj1t"]
 [ext_resource type="Script" uid="uid://bj4rrip11tc6i" path="res://scripts/game/day_night_cycle.gd" id="7_daynight"]
+[ext_resource type="PackedScene" uid="uid://b742ktmlp1hjo" path="res://scenes/levels/ocean.tscn" id="8_ocean"]
+[ext_resource type="PackedScene" path="res://assets/level/placeholders/dock.tscn" id="8_tipki"]
+[ext_resource type="PackedScene" path="res://assets/level/placeholders/cottage.tscn" id="9_85g3d"]
+[ext_resource type="PackedScene" path="res://assets/level/placeholders/log.tscn" id="10_choun"]
+[ext_resource type="PackedScene" path="res://assets/level/placeholders/cart.tscn" id="11_ya4ey"]
+[ext_resource type="PackedScene" path="res://assets/level/placeholders/barrel.tscn" id="12_trceg"]
+[ext_resource type="PackedScene" path="res://assets/level/placeholders/crate.tscn" id="13_a8y0u"]
+[ext_resource type="PackedScene" path="res://assets/level/placeholders/field_overgrown.tscn" id="14_a8y0u"]
+[ext_resource type="PackedScene" path="res://assets/level/placeholders/longhouse.tscn" id="15_jkv2x"]
+[ext_resource type="PackedScene" path="res://assets/level/placeholders/smithy.tscn" id="17_muem4"]
 
 [sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_env01"]
 rayleigh_color = Color(0.26, 0.41, 0.58, 1)
@@ -24,11 +34,11 @@ radiance_size = 4
 background_mode = 2
 sky = SubResource("Sky_env01")
 ambient_light_source = 3
-ambient_light_energy = 0.8
 reflected_light_source = 2
 tonemap_mode = 3
 tonemap_exposure = 1.2
 tonemap_white = 5.0
+ssr_enabled = true
 ssao_enabled = true
 ssao_radius = 3.0
 ssao_intensity = 2.5
@@ -176,32 +186,72 @@ script = ExtResource("7_daynight")
 data_directory = "res://assets/level"
 material = SubResource("Terrain3DMaterial_o6xl0")
 assets = SubResource("Terrain3DAssets_choun")
-vertex_spacing = 1.5
+vertex_spacing = 2.0
 show_checkered = true
 top_level = true
 script = ExtResource("3_sugp2")
 height_file_name = "C:/Users/olema/OneDrive/projects/2026/Heathen_Prototype/assets/heightmaps/rogaland_10K0000.exr"
 import_position = Vector2i(-5120, -5120)
-import_scale = 0.3
+import_scale = 0.4
 metadata/_edit_lock_ = true
 
 [node name="TerrainFoliage" type="Node3D" parent="World" unique_id=302830105]
 script = ExtResource("5_foliage")
 density = 1.0
 
+[node name="Ocean" parent="World" unique_id=990331587 instance=ExtResource("8_ocean")]
+
+[node name="PathSegment" parent="World" unique_id=14686769 instance=ExtResource("6_jbj1t")]
+transform = Transform3D(0.2043423, 0, 0.9788995, -0.10327433, 0.9944193, 0.021558205, -0.97343653, -0.105500445, 0.20320193, 6667.887, 2.509265, 9010.519)
+
 [node name="Levels" type="Node3D" parent="." unique_id=1684067333]
 
 [node name="Settlements" type="Node3D" parent="Levels" unique_id=2077427986]
 
-[node name="Frafjord" parent="Levels/Settlements" unique_id=1403165718 instance=ExtResource("5_o6xl0")]
-transform = Transform3D(-0.61060137, 0, -0.7919381, 0, 1, 0, 0.7919381, 0, -0.61060137, 2282.9922, 1.4818964, 3670.6362)
+[node name="Frafjord" type="Node3D" parent="Levels/Settlements" unique_id=1426585751]
+
+[node name="Dock" parent="Levels/Settlements/Frafjord" unique_id=964452339 instance=ExtResource("8_tipki")]
+transform = Transform3D(0.9383061, 0, -0.34580594, 0, 1, 0, 0.34580594, 0, 0.9383061, 6669.169, 0.011640549, 9002.493)
+
+[node name="Dock2" parent="Levels/Settlements/Frafjord" unique_id=1855277452 instance=ExtResource("8_tipki")]
+transform = Transform3D(0.9383061, 0, -0.34580594, 0, 1, 0, 0.34580594, 0, 0.9383061, 6669.8237, 0.007929325, 9000.758)
+
+[node name="Cottage" parent="Levels/Settlements/Frafjord" unique_id=1229027032 instance=ExtResource("9_85g3d")]
+transform = Transform3D(0.21091539, 0, 0.9775044, 0, 1, 0, -0.9775044, 0, 0.21091539, 6661.099, 2.4042287, 9011.898)
+
+[node name="Bandit" parent="Levels/Settlements/Frafjord" unique_id=1145995685 instance=ExtResource("4_jyhfs")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6620.522, 1.9471779, 9033.587)
+
+[node name="Bandit2" parent="Levels/Settlements/Frafjord" unique_id=1182602049 instance=ExtResource("4_jyhfs")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6629.3257, 1.9090843, 9004.074)
+
+[node name="Bandit3" parent="Levels/Settlements/Frafjord" unique_id=1386817533 instance=ExtResource("4_jyhfs")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6647.81, 2.6594796, 9019.417)
 
 [node name="Characters" type="Node3D" parent="." unique_id=592048963]
 
 [node name="Player" parent="Characters" unique_id=731287834 instance=ExtResource("2_0wfyh")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3674.8755, 2.1106777, 5238.1777)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6607.347, 1.3534615, 8991.426)
 
-[node name="Bandit" parent="Characters" unique_id=1145995685 instance=ExtResource("4_jyhfs")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3400.36, 1.1734459, 5203.4204)
+[node name="Log" parent="." unique_id=375041679 instance=ExtResource("10_choun")]
+transform = Transform3D(0.78431106, 0, -0.6203678, 0, 1, 0, 0.6203678, 0, 0.78431106, 6660.8057, 2.6504045, 9016.554)
 
-[editable path="Levels/Settlements/Frafjord"]
+[node name="Cart" parent="." unique_id=459797182 instance=ExtResource("11_ya4ey")]
+transform = Transform3D(0.9186603, 0, -0.3950485, 0, 1, 0, 0.3950485, 0, 0.9186603, 6660.896, 2.5707424, 9018.076)
+
+[node name="Barrel" parent="." unique_id=37508885 instance=ExtResource("12_trceg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6662.61, 2.7181456, 9014.654)
+
+[node name="Crate" parent="." unique_id=1438554472 instance=ExtResource("13_a8y0u")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6663.009, 2.7245483, 9014.033)
+
+[node name="FieldOvergrown" parent="." unique_id=1902961378 instance=ExtResource("14_a8y0u")]
+transform = Transform3D(1.9394724, 0, -0.42269614, 0, 1.9849998, 0, 0.42269614, 0, 1.9394724, 6645.9277, 2.5643616, 9013.889)
+
+[node name="Longhouse" parent="." unique_id=630378881 instance=ExtResource("15_jkv2x")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6622.5347, 2.1052241, 9036.639)
+
+[node name="Smithy" parent="." unique_id=1867471841 instance=ExtResource("17_muem4")]
+transform = Transform3D(0.87983114, 0, -0.47528642, 0, 1, 0, 0.47528642, 0, 0.87983114, 6627.299, 1.6637712, 9001.861)
+
+[editable path="World/Ocean"]

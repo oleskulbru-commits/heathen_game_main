@@ -1,0 +1,50 @@
+[gd_scene format=3]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_handle"]
+top_radius = 0.02
+bottom_radius = 0.022
+height = 1.6
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_handle"]
+albedo_color = Color(0.3, 0.18, 0.08, 1)
+roughness = 0.85
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_tine"]
+top_radius = 0.008
+bottom_radius = 0.01
+height = 0.35
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tine"]
+albedo_color = Color(0.5, 0.5, 0.52, 1)
+metallic = 0.8
+roughness = 0.35
+
+[sub_resource type="BoxMesh" id="BoxMesh_crossbar"]
+size = Vector3(0.12, 0.025, 0.025)
+
+[node name="Pitchfork" type="Node3D"]
+
+[node name="Handle" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_handle")
+surface_material_override/0 = SubResource("StandardMaterial3D_handle")
+
+[node name="Crossbar" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+mesh = SubResource("BoxMesh_crossbar")
+surface_material_override/0 = SubResource("StandardMaterial3D_tine")
+
+[node name="TineLeft" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.05, 0.98, 0)
+mesh = SubResource("CylinderMesh_tine")
+surface_material_override/0 = SubResource("StandardMaterial3D_tine")
+
+[node name="TineCenter" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.98, 0)
+mesh = SubResource("CylinderMesh_tine")
+surface_material_override/0 = SubResource("StandardMaterial3D_tine")
+
+[node name="TineRight" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.05, 0.98, 0)
+mesh = SubResource("CylinderMesh_tine")
+surface_material_override/0 = SubResource("StandardMaterial3D_tine")

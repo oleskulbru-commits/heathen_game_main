@@ -1,0 +1,49 @@
+[gd_scene format=3]
+
+[sub_resource type="BoxMesh" id="BoxMesh_blade"]
+size = Vector3(0.06, 1.0, 0.015)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_blade"]
+albedo_color = Color(0.7, 0.72, 0.75, 1)
+metallic = 0.9
+roughness = 0.2
+
+[sub_resource type="BoxMesh" id="BoxMesh_guard"]
+size = Vector3(0.22, 0.04, 0.04)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_guard"]
+albedo_color = Color(0.35, 0.3, 0.2, 1)
+metallic = 0.7
+roughness = 0.4
+
+[sub_resource type="BoxMesh" id="BoxMesh_grip"]
+size = Vector3(0.04, 0.28, 0.04)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_grip"]
+albedo_color = Color(0.25, 0.15, 0.08, 1)
+roughness = 0.8
+
+[sub_resource type="BoxMesh" id="BoxMesh_pommel"]
+size = Vector3(0.06, 0.04, 0.04)
+
+[node name="Longsword" type="Node3D"]
+
+[node name="Blade" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.56, 0)
+mesh = SubResource("BoxMesh_blade")
+surface_material_override/0 = SubResource("StandardMaterial3D_blade")
+
+[node name="Guard" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.04, 0)
+mesh = SubResource("BoxMesh_guard")
+surface_material_override/0 = SubResource("StandardMaterial3D_guard")
+
+[node name="Grip" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.12, 0)
+mesh = SubResource("BoxMesh_grip")
+surface_material_override/0 = SubResource("StandardMaterial3D_grip")
+
+[node name="Pommel" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.28, 0)
+mesh = SubResource("BoxMesh_pommel")
+surface_material_override/0 = SubResource("StandardMaterial3D_guard")
