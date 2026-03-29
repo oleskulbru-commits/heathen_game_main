@@ -1,0 +1,25 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_mk6pd"]
+albedo_color = Color(0.55, 0.45, 0.3, 1)
+roughness = 0.9
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_u4mbx"]
+top_radius = 0.25
+bottom_radius = 0.25
+height = 0.15
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_8ld85"]
+height = 0.15
+radius = 0.25
+
+[node name="RopeCoil" type="StaticBody3D" unique_id=382943705]
+
+[node name="@MeshInstance3D@74" type="MeshInstance3D" parent="." unique_id=1296859231]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.075, 0)
+material_override = SubResource("StandardMaterial3D_mk6pd")
+mesh = SubResource("CylinderMesh_u4mbx")
+
+[node name="@CollisionShape3D@75" type="CollisionShape3D" parent="." unique_id=1389627832]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.075, 0)
+shape = SubResource("CylinderShape3D_8ld85")

@@ -1,0 +1,23 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_blue"]
+albedo_color = Color(0.18, 0.32, 0.15, 1)
+roughness = 0.9
+
+[sub_resource type="SphereMesh" id="SphereMesh_blue"]
+radius = 0.35
+height = 0.5
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_blue"]
+radius = 0.35
+
+[node name="BlueberryShrub" type="StaticBody3D"]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.2, 0, 0, 0, 1, 0, 0, 0, 1.2, 0, 0.25, 0)
+material_override = SubResource("StandardMaterial3D_blue")
+mesh = SubResource("SphereMesh_blue")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0)
+shape = SubResource("SphereShape3D_blue")

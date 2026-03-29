@@ -11,6 +11,7 @@ height = 1.8602295
 script = ExtResource("1_player_script")
 
 [node name="xbot_root" parent="." unique_id=1806457301 instance=ExtResource("2_dovo2")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=414585826]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.92840576, 0)

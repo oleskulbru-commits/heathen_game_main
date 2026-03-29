@@ -1,0 +1,22 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0sc4o"]
+albedo_color = Color(0.4, 0.28, 0.14, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_ruwe8"]
+size = Vector3(0.6, 0.6, 0.6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_h3ni4"]
+size = Vector3(0.6, 0.6, 0.6)
+
+[node name="Crate" type="StaticBody3D" unique_id=1438554472]
+
+[node name="@MeshInstance3D@72" type="MeshInstance3D" parent="." unique_id=2036569231]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+material_override = SubResource("StandardMaterial3D_0sc4o")
+mesh = SubResource("BoxMesh_ruwe8")
+
+[node name="@CollisionShape3D@73" type="CollisionShape3D" parent="." unique_id=2106095563]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+shape = SubResource("BoxShape3D_h3ni4")

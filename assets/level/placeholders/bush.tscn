@@ -1,0 +1,23 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1v1pa"]
+albedo_color = Color(0.2, 0.35, 0.12, 1)
+roughness = 0.9
+
+[sub_resource type="SphereMesh" id="SphereMesh_lcgcw"]
+radius = 0.6
+height = 1.2
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_1nrqm"]
+radius = 0.6
+
+[node name="Bush" type="StaticBody3D" unique_id=799952121]
+
+[node name="@MeshInstance3D@20" type="MeshInstance3D" parent="." unique_id=1419328247]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+material_override = SubResource("StandardMaterial3D_1v1pa")
+mesh = SubResource("SphereMesh_lcgcw")
+
+[node name="@CollisionShape3D@21" type="CollisionShape3D" parent="." unique_id=1299832773]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+shape = SubResource("SphereShape3D_1nrqm")

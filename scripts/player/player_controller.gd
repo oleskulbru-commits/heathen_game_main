@@ -13,6 +13,7 @@ extends CharacterBody3D
 @export var head_max_pitch_deg: float = 25.0
 @export var head_idle_weight: float = 0.55
 @export var head_move_weight: float = 0.12
+@export var blend_lerp_speed: float = 8.0
 
 # ── Node references ──────────────────────────────────────────────────────────
 @onready var camera_pivot: Node3D = $CameraPivot
@@ -79,7 +80,7 @@ func _physics_process(delta: float) -> void:
 		_set_mode(PlayerMode.TRAVERSAL)
 
 	# ── Update animation state machine ───────────────────────────────────
-	_update_animation(is_moving, is_sprinting)
+	_update_animation(is_moving, is_sprinting, delta)
 
 	# ── Rotate visual mesh toward move direction ─────────────────────────
 	if is_moving:
@@ -184,18 +185,23 @@ func _apply_head_look(delta: float) -> void:
 # ── Animation ────────────────────────────────────────────────────────────────
 
 var _was_moving := false
+var _current_loco_blend: float = 0.0
+var _current_crouch_blend: float = 0.0
 
-func _update_animation(is_moving: bool, is_sprinting: bool) -> void:
+func _update_animation(is_moving: bool, is_sprinting: bool, delta: float) -> void:
 	anim_tree.set("parameters/conditions/is_moving", is_moving)
 	anim_tree.set("parameters/conditions/is_stopping", _was_moving and not is_moving)
 
 	if _mode == PlayerMode.STEALTH:
-		anim_tree.set("parameters/CrouchLocomotion/blend_position",
-			1.0 if is_moving else 0.0)
+		var target := 1.0 if is_moving else 0.0
+		_current_crouch_blend = move_toward(_current_crouch_blend, target, blend_lerp_speed * delta)
+		anim_tree.set("parameters/CrouchLocomotion/blend_position", _current_crouch_blend)
 	else:
+		var target := 0.0
 		if is_moving:
-			var blend := 2.0 if is_sprinting else 1.0
-			anim_tree.set("parameters/Locomotion/blend_position", blend)
+			target = 2.0 if is_sprinting else 1.0
+		_current_loco_blend = move_toward(_current_loco_blend, target, blend_lerp_speed * delta)
+		anim_tree.set("parameters/Locomotion/blend_position", _current_loco_blend)
 
 	_was_moving = is_moving
 

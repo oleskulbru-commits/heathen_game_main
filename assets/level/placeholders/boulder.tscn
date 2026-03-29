@@ -1,0 +1,23 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_s1g7x"]
+albedo_color = Color(0.38, 0.36, 0.33, 1)
+roughness = 0.9
+
+[sub_resource type="SphereMesh" id="SphereMesh_erfhy"]
+radius = 1.2
+height = 2.4
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_w3q0f"]
+radius = 1.2
+
+[node name="Boulder" type="StaticBody3D" unique_id=1123877052]
+
+[node name="@MeshInstance3D@14" type="MeshInstance3D" parent="." unique_id=1606843587]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+material_override = SubResource("StandardMaterial3D_s1g7x")
+mesh = SubResource("SphereMesh_erfhy")
+
+[node name="@CollisionShape3D@15" type="CollisionShape3D" parent="." unique_id=1106499935]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("SphereShape3D_w3q0f")

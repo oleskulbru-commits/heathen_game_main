@@ -1,0 +1,22 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sultq"]
+albedo_color = Color(0.3, 0.2, 0.1, 1)
+roughness = 0.9
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_syptc"]
+height = 3.0
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_0wc77"]
+height = 3.0
+
+[node name="Boat" type="StaticBody3D" unique_id=287213633]
+
+[node name="@MeshInstance3D@56" type="MeshInstance3D" parent="." unique_id=1352226065]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0.3, 0)
+material_override = SubResource("StandardMaterial3D_sultq")
+mesh = SubResource("CapsuleMesh_syptc")
+
+[node name="@CollisionShape3D@57" type="CollisionShape3D" parent="." unique_id=1230526426]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0.3, 0)
+shape = SubResource("CapsuleShape3D_0wc77")

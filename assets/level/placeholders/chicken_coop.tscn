@@ -1,0 +1,34 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_g8ir8"]
+albedo_color = Color(0.35, 0.22, 0.12, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_bsaks"]
+size = Vector3(1.2, 0.8, 0.9)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_uykn2"]
+albedo_color = Color(0.28, 0.18, 0.1, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_g7cm4"]
+size = Vector3(1.4, 0.15, 1.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1gnd8"]
+size = Vector3(1.2, 0.95, 0.9)
+
+[node name="ChickenCoop" type="StaticBody3D" unique_id=1555242921]
+
+[node name="@MeshInstance3D@45" type="MeshInstance3D" parent="." unique_id=783037136]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+material_override = SubResource("StandardMaterial3D_g8ir8")
+mesh = SubResource("BoxMesh_bsaks")
+
+[node name="@MeshInstance3D@46" type="MeshInstance3D" parent="." unique_id=1369916817]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.88, 0)
+material_override = SubResource("StandardMaterial3D_uykn2")
+mesh = SubResource("BoxMesh_g7cm4")
+
+[node name="@CollisionShape3D@47" type="CollisionShape3D" parent="." unique_id=33039261]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.475, 0)
+shape = SubResource("BoxShape3D_1gnd8")

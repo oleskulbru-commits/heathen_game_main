@@ -1,0 +1,25 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ffnfa"]
+albedo_color = Color(0.35, 0.22, 0.1, 1)
+roughness = 0.9
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_02a3f"]
+top_radius = 0.2
+bottom_radius = 0.2
+height = 3.0
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_788k5"]
+radius = 0.2
+height = 3.0
+
+[node name="Log" type="StaticBody3D" unique_id=375041679]
+
+[node name="@MeshInstance3D@22" type="MeshInstance3D" parent="." unique_id=89009538]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0.2, 0)
+material_override = SubResource("StandardMaterial3D_ffnfa")
+mesh = SubResource("CylinderMesh_02a3f")
+
+[node name="@CollisionShape3D@23" type="CollisionShape3D" parent="." unique_id=296976258]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0.2, 0)
+shape = SubResource("CapsuleShape3D_788k5")

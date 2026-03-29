@@ -1,0 +1,22 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wild"]
+albedo_color = Color(0.65, 0.55, 0.2, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_wild"]
+size = Vector3(0.7, 0.3, 0.7)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wild"]
+size = Vector3(0.7, 0.3, 0.7)
+
+[node name="WildflowerCluster" type="StaticBody3D"]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
+material_override = SubResource("StandardMaterial3D_wild")
+mesh = SubResource("BoxMesh_wild")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
+shape = SubResource("BoxShape3D_wild")

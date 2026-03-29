@@ -1,0 +1,67 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/xbots/ybot_root.glb" id="1_glb"]
+[ext_resource type="AnimationLibrary" path="res://scenes/xbots/npc_male_locomotion.res" id="2_npc_lib"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_idle"]
+animation = &"NpcLoco/idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_idle_bp"]
+animation = &"NpcLoco/idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_walk"]
+animation = &"NpcLoco/walking"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_run"]
+animation = &"NpcLoco/running"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_loco"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_idle_bp")
+blend_point_0/pos = 0.0
+blend_point_1/node = SubResource("AnimationNodeAnimation_walk")
+blend_point_1/pos = 1.0
+blend_point_2/node = SubResource("AnimationNodeAnimation_run")
+blend_point_2/pos = 2.0
+max_space = 2.0
+
+[sub_resource type="Curve" id="Curve_xfade_ease"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="t_start_idle"]
+xfade_time = 0.15
+xfade_curve = SubResource("Curve_xfade_ease")
+advance_mode = 2
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="t_idle_loco"]
+xfade_time = 0.3
+xfade_curve = SubResource("Curve_xfade_ease")
+advance_mode = 2
+advance_condition = &"is_moving"
+
+[sub_resource type="AnimationNodeStateMachineTransition" id="t_loco_idle"]
+xfade_time = 0.35
+xfade_curve = SubResource("Curve_xfade_ease")
+advance_mode = 2
+advance_condition = &"is_stopping"
+
+[sub_resource type="AnimationNodeStateMachine" id="AnimationNodeStateMachine_root"]
+states/Idle/node = SubResource("AnimationNodeAnimation_idle")
+states/Idle/position = Vector2(450, 100)
+states/Locomotion/node = SubResource("AnimationNodeBlendSpace1D_loco")
+states/Locomotion/position = Vector2(450, -50)
+states/Start/position = Vector2(150, 100)
+transitions = ["Start", "Idle", SubResource("t_start_idle"), "Idle", "Locomotion", SubResource("t_idle_loco"), "Locomotion", "Idle", SubResource("t_loco_idle")]
+graph_offset = Vector2(-57, -221)
+
+[node name="ybot_npc" instance=ExtResource("1_glb")]
+
+[node name="AnimationPlayer" parent="." index="1"]
+libraries/NpcLoco = ExtResource("2_npc_lib")
+
+[node name="AnimationTree" type="AnimationTree" parent="." index="2"]
+tree_root = SubResource("AnimationNodeStateMachine_root")
+anim_player = NodePath("../AnimationPlayer")
+parameters/conditions/is_moving = false
+parameters/conditions/is_stopping = false
+parameters/Locomotion/blend_position = 0.0

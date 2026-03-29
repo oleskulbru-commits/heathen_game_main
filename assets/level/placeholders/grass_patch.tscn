@@ -1,0 +1,22 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kpojc"]
+albedo_color = Color(0.3, 0.45, 0.15, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_afcmm"]
+size = Vector3(2, 0.05, 2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_fodpf"]
+size = Vector3(2, 0.05, 2)
+
+[node name="GrassPatch" type="StaticBody3D" unique_id=251689769]
+
+[node name="@MeshInstance3D@18" type="MeshInstance3D" parent="." unique_id=1801287841]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.025, 0)
+material_override = SubResource("StandardMaterial3D_kpojc")
+mesh = SubResource("BoxMesh_afcmm")
+
+[node name="@CollisionShape3D@19" type="CollisionShape3D" parent="." unique_id=391575420]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.025, 0)
+shape = SubResource("BoxShape3D_fodpf")

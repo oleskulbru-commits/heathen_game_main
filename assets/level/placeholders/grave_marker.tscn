@@ -1,0 +1,34 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8jhbb"]
+albedo_color = Color(0.45, 0.43, 0.4, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_mp2su"]
+size = Vector3(0.08, 0.7, 0.06)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_svebj"]
+albedo_color = Color(0.45, 0.43, 0.4, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_wkf0n"]
+size = Vector3(0.35, 0.06, 0.06)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_8pgqf"]
+size = Vector3(0.35, 0.7, 0.06)
+
+[node name="GraveMarker" type="StaticBody3D" unique_id=973860211]
+
+[node name="@MeshInstance3D@67" type="MeshInstance3D" parent="." unique_id=1042144924]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
+material_override = SubResource("StandardMaterial3D_8jhbb")
+mesh = SubResource("BoxMesh_mp2su")
+
+[node name="@MeshInstance3D@68" type="MeshInstance3D" parent="." unique_id=1466824670]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0)
+material_override = SubResource("StandardMaterial3D_svebj")
+mesh = SubResource("BoxMesh_wkf0n")
+
+[node name="@CollisionShape3D@69" type="CollisionShape3D" parent="." unique_id=1039055890]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
+shape = SubResource("BoxShape3D_8pgqf")

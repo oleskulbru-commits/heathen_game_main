@@ -1,0 +1,22 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_brack"]
+albedo_color = Color(0.28, 0.38, 0.08, 1)
+roughness = 0.88
+
+[sub_resource type="BoxMesh" id="BoxMesh_brack"]
+size = Vector3(1.0, 0.6, 1.0)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_brack"]
+size = Vector3(1.0, 0.6, 1.0)
+
+[node name="BrackenFern" type="StaticBody3D"]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+material_override = SubResource("StandardMaterial3D_brack")
+mesh = SubResource("BoxMesh_brack")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+shape = SubResource("BoxShape3D_brack")

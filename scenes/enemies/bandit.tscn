@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://c6a7kqmwiipkx"]
+
+[ext_resource type="Script" uid="uid://cqypn0kkngjl7" path="res://scripts/enemies/bandit_controller.gd" id="1_bandit_script"]
+[ext_resource type="PackedScene" uid="uid://brxwvwmv1ip30" path="res://scenes/xbots/ybot_root.tscn" id="2_ybot"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_bandit"]
+radius = 0.30078125
+height = 1.8602295
+
+[node name="Bandit" type="CharacterBody3D" unique_id=1182602049]
+collision_layer = 2
+script = ExtResource("1_bandit_script")
+
+[node name="ybot_root" parent="." unique_id=1981491901 instance=ExtResource("2_ybot")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1068867929]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.92840576, 0)
+shape = SubResource("CapsuleShape3D_bandit")
+
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="." unique_id=236878344]

@@ -1,0 +1,38 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ejc5h"]
+albedo_color = Color(0.9, 0.88, 0.82, 1)
+roughness = 0.9
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_5in2e"]
+top_radius = 0.1
+bottom_radius = 0.1
+height = 5.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3xgsm"]
+albedo_color = Color(0.45, 0.55, 0.2, 1)
+roughness = 0.9
+
+[sub_resource type="SphereMesh" id="SphereMesh_au2og"]
+radius = 1.8
+height = 3.6
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_r0w6t"]
+radius = 1.0
+height = 8.0
+
+[node name="BirchTree" type="StaticBody3D" unique_id=378308961]
+
+[node name="@MeshInstance3D@7" type="MeshInstance3D" parent="." unique_id=31278513]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
+material_override = SubResource("StandardMaterial3D_ejc5h")
+mesh = SubResource("CylinderMesh_5in2e")
+
+[node name="@MeshInstance3D@8" type="MeshInstance3D" parent="." unique_id=1413265569]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
+material_override = SubResource("StandardMaterial3D_3xgsm")
+mesh = SubResource("SphereMesh_au2og")
+
+[node name="@CollisionShape3D@9" type="CollisionShape3D" parent="." unique_id=2003077179]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0)
+shape = SubResource("CapsuleShape3D_r0w6t")
