@@ -51,7 +51,7 @@ func _setup_activity() -> void:
 		return
 	var lib_path := activity_library
 	if not lib_path.begins_with("res://"):
-		lib_path = "res://scenes/xbots/" + lib_path
+		lib_path = "res://assets/animations/animation_libraries/" + lib_path
 	var lib := load(lib_path) as AnimationLibrary
 	if not lib:
 		push_warning("Villager: Cannot load activity library '%s'" % lib_path)

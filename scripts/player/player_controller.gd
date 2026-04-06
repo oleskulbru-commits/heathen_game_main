@@ -14,9 +14,16 @@ extends CharacterBody3D
 @export var head_idle_weight: float = 0.55
 @export var head_move_weight: float = 0.12
 @export var blend_lerp_speed: float = 8.0
+@export_group("Focus Mode")
+@export var focus_zoom_fov: float = 35.0
+@export var focus_zoom_speed: float = 3.0
+@export var focus_arm_length: float = 2.0
+@export var heartbeat_sound: AudioStream
 
 # ── Node references ──────────────────────────────────────────────────────────
 @onready var camera_pivot: Node3D = $CameraPivot
+@onready var _spring_arm: SpringArm3D = $CameraPivot/SpringArm3D
+@onready var _camera: Camera3D = $CameraPivot/SpringArm3D/Camera3D
 @onready var visual_root: Node3D = $xbot_root
 @onready var anim_tree: AnimationTree = $xbot_root/AnimationTree
 @onready var _skeleton: Skeleton3D = $xbot_root/Armature/Skeleton3D
@@ -30,17 +37,70 @@ var _look_chain: Array = []  # [{idx, yaw_frac, pitch_frac}]
 var _head_look_current: Vector2 = Vector2.ZERO  # x = pitch, y = yaw (radians)
 var _look_weight: float = 0.0
 
+# ── Focus mode ───────────────────────────────────────────────────────────────
+signal focus_changed(active: bool)
+var _focus_active: bool = false
+var _default_fov: float
+var _default_arm_length: float
+var _heartbeat_player: AudioStreamPlayer
+var _heartbeat_tween: Tween
+
 # ── Player mode ──────────────────────────────────────────────────────────────
 enum PlayerMode { TRAVERSAL, STEALTH }
 var _mode: PlayerMode = PlayerMode.TRAVERSAL
 
+# ── Health & Stamina ─────────────────────────────────────────────────────────
+signal health_changed(current: float, maximum: float)
+signal stamina_changed(current: float, maximum: float)
+
+@export var max_health: float = 100.0
+@export var max_stamina: float = 100.0
+@export var stamina_regen_rate: float = 15.0
+@export var sprint_stamina_cost: float = 12.0
+
+var _health: float = 100.0
+var _stamina: float = 100.0
+var is_sprinting: bool = false
+var is_moving: bool = false
+
+func get_health() -> float:
+	return _health
+
+func get_stamina() -> float:
+	return _stamina
+
+func take_damage(amount: float) -> void:
+	_health = clampf(_health - amount, 0.0, max_health)
+	health_changed.emit(_health, max_health)
+
+func heal(amount: float) -> void:
+	_health = clampf(_health + amount, 0.0, max_health)
+	health_changed.emit(_health, max_health)
+
+func is_in_stealth() -> bool:
+	return _mode == PlayerMode.STEALTH
+
+func is_focused() -> bool:
+	return _focus_active
+
 # ── Lifecycle ────────────────────────────────────────────────────────────────
 
 func _ready() -> void:
-	_ensure_input_map()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	anim_tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_PHYSICS
 	anim_tree.active = true
 	_init_look_chain()
+	add_to_group("player")
+	health_changed.emit(_health, max_health)
+	stamina_changed.emit(_stamina, max_stamina)
+	# Focus mode defaults
+	_default_fov = _camera.fov
+	_default_arm_length = _spring_arm.spring_length
+	# Heartbeat audio
+	_heartbeat_player = AudioStreamPlayer.new()
+	_heartbeat_player.bus = &"Master"
+	_heartbeat_player.volume_db = -80.0
+	add_child(_heartbeat_player)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -72,8 +132,17 @@ func _physics_process(delta: float) -> void:
 	if move_dir.length_squared() > 1.0:
 		move_dir = move_dir.normalized()
 
-	var is_moving := move_dir.length() > 0.1
-	var is_sprinting := is_moving and Input.is_action_pressed("sprint")
+	is_moving = move_dir.length() > 0.1
+	is_sprinting = is_moving and Input.is_action_pressed("sprint")
+
+	# ── Stamina ─────────────────────────────────────────────────────────
+	if is_sprinting:
+		_stamina = clampf(_stamina - sprint_stamina_cost * delta, 0.0, max_stamina)
+		if _stamina <= 0.0:
+			is_sprinting = false
+	elif _stamina < max_stamina:
+		_stamina = clampf(_stamina + stamina_regen_rate * delta, 0.0, max_stamina)
+	stamina_changed.emit(_stamina, max_stamina)
 
 	# ── Sprint exits stealth ────────────────────────────────────────────
 	if is_sprinting and _mode == PlayerMode.STEALTH:
@@ -121,6 +190,7 @@ func _init_look_chain() -> void:
 			e.pitch_frac /= total_pitch
 
 func _process(delta: float) -> void:
+	_update_focus(delta)
 	_apply_head_look(delta)
 
 func _apply_head_look(delta: float) -> void:
@@ -181,6 +251,36 @@ func _apply_head_look(delta: float) -> void:
 		var modified := bone_pose
 		modified.basis = extra * bone_pose.basis
 		_skeleton.set_bone_global_pose_override(entry.idx, modified, 1.0, true)
+
+# ── Focus Mode ───────────────────────────────────────────────────────────────
+
+func _update_focus(delta: float) -> void:
+	var wants_focus := Input.is_action_pressed("focus")
+	if wants_focus != _focus_active:
+		_focus_active = wants_focus
+		print("[Focus] toggled: _focus_active=", _focus_active)
+		focus_changed.emit(_focus_active)
+		_update_heartbeat()
+
+	var t := clampf(focus_zoom_speed * delta, 0.0, 1.0)
+	var target_fov := focus_zoom_fov if _focus_active else _default_fov
+	var target_arm := focus_arm_length if _focus_active else _default_arm_length
+	_camera.fov = lerpf(_camera.fov, target_fov, t)
+	_spring_arm.spring_length = lerpf(_spring_arm.spring_length, target_arm, t)
+
+func _update_heartbeat() -> void:
+	if _heartbeat_tween:
+		_heartbeat_tween.kill()
+	if _focus_active:
+		if heartbeat_sound and not _heartbeat_player.playing:
+			_heartbeat_player.stream = heartbeat_sound
+			_heartbeat_player.play()
+		_heartbeat_tween = create_tween().set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+		_heartbeat_tween.tween_property(_heartbeat_player, "volume_db", -6.0, 0.6)
+	else:
+		_heartbeat_tween = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+		_heartbeat_tween.tween_property(_heartbeat_player, "volume_db", -80.0, 0.4)
+		_heartbeat_tween.tween_callback(_heartbeat_player.stop)
 
 # ── Animation ────────────────────────────────────────────────────────────────
 
@@ -243,29 +343,26 @@ func _apply_root_motion(delta: float) -> void:
 	var root_motion := anim_tree.get_root_motion_position()
 	# Transform from the visual mesh's local space → world space
 	root_motion = visual_root.global_transform.basis * root_motion
+	# Apply terrain locomotion modifier (mud/scree/etc.)
+	var loco_mod := _get_locomotion_modifier()
+	root_motion *= loco_mod
 	# Root motion is a per-frame displacement; convert to velocity
 	if delta > 0.0:
 		velocity.x = root_motion.x / delta
 		velocity.z = root_motion.z / delta
 
-# ── Input Map ────────────────────────────────────────────────────────────────
 
-func _ensure_input_map() -> void:
-	_bind_key("move_forward", KEY_W)
-	_bind_key("move_back", KEY_S)
-	_bind_key("move_left", KEY_A)
-	_bind_key("move_right", KEY_D)
-	_bind_key("sprint", KEY_SHIFT)
-	_bind_key("crouch", KEY_CTRL)
-	_bind_key("ui_cancel", KEY_ESCAPE)
+# ── Terrain locomotion helpers ───────────────────────────────────────────────
 
-func _bind_key(action: StringName, keycode: Key) -> void:
-	if not InputMap.has_action(action):
-		InputMap.add_action(action)
-	for evt in InputMap.action_get_events(action):
-		if evt is InputEventKey:
-			InputMap.action_erase_event(action, evt)
-	var key := InputEventKey.new()
-	key.physical_keycode = keycode
-	key.keycode = keycode
-	InputMap.action_add_event(action, key)
+func _get_locomotion_modifier() -> float:
+	var loco_node := get_node_or_null("TerrainLocomotion")
+	if loco_node and "locomotion_modifier" in loco_node:
+		return loco_node.locomotion_modifier
+	return 1.0
+
+
+func _get_stamina_mult() -> float:
+	var loco_node := get_node_or_null("TerrainLocomotion")
+	if loco_node and "stamina_mult" in loco_node:
+		return loco_node.stamina_mult
+	return 1.0

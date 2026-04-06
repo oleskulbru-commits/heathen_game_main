@@ -3,16 +3,7 @@ extends Node3D
 ## Attach as a child of the Game node (sibling of Terrain3D and Player).
 ## Streams MultiMesh vegetation chunks based on player proximity,
 ## using slope angle and elevation to pick Norwegian fjord-appropriate plants.
-## Uses crossed-quad billboards with procedural shaders for each plant type.
-
-# ── Shader preloads ──────────────────────────────────────────────────────────
-const SHADER_GRASS      := preload("res://assets/shaders/foliage/grass.gdshader")
-const SHADER_WILDFLOWER := preload("res://assets/shaders/foliage/wildflower.gdshader")
-const SHADER_BUSH       := preload("res://assets/shaders/foliage/bush.gdshader")
-const SHADER_HEATHER    := preload("res://assets/shaders/foliage/heather.gdshader")
-const SHADER_FERN       := preload("res://assets/shaders/foliage/fern.gdshader")
-const SHADER_MOSS       := preload("res://assets/shaders/foliage/moss_lichen.gdshader")
-const SHADER_REED       := preload("res://assets/shaders/foliage/reed.gdshader")
+## Uses placeholder scenes from assets/level/placeholders/ for mesh + material.
 
 # ── Configuration ────────────────────────────────────────────────────────────
 @export var scatter_radius: float = 256.0  ## Distance from player to populate (meters)
@@ -36,7 +27,8 @@ var _height_max: float = 100.0
 
 func _ready() -> void:
 	_terrain = _find_child_by_class(get_parent(), "Terrain3D")
-	_player = get_parent().get_node_or_null("Player")
+	# Player is under Characters, not World — search from scene root
+	_player = get_tree().root.find_child("Player", true, false)
 	if not _terrain or not _terrain.data:
 		push_warning("TerrainFoliage: No Terrain3D with data found.")
 		set_process(false)
@@ -61,79 +53,98 @@ func _process(_delta: float) -> void:
 	_update_chunks(player_chunk)
 
 
+# ── Extract mesh + material from a placeholder scene ─────────────────────────
+
+static func _extract_mesh_from_scene(scene_path: String) -> Dictionary:
+	var packed := load(scene_path) as PackedScene
+	if not packed:
+		push_warning("TerrainFoliage: Failed to load scene: " + scene_path)
+		return {}
+	var instance := packed.instantiate()
+	var mesh_instance: MeshInstance3D = null
+	# Find the first MeshInstance3D child
+	for child in instance.get_children():
+		if child is MeshInstance3D:
+			mesh_instance = child
+			break
+	if not mesh_instance or not mesh_instance.mesh:
+		instance.queue_free()
+		return {}
+	var mesh: Mesh = mesh_instance.mesh.duplicate()
+	var mat: Material = mesh_instance.material_override
+	if mat:
+		mat = mat.duplicate()
+	elif mesh.get_surface_count() > 0:
+		mat = mesh.surface_get_material(0)
+		if mat:
+			mat = mat.duplicate()
+	# Get the mesh's local Y offset from the MeshInstance3D transform
+	var y_offset: float = mesh_instance.transform.origin.y
+	instance.queue_free()
+	return { "mesh": mesh, "material": mat, "y_offset": y_offset }
+
+
 # ── Vegetation definitions ───────────────────────────────────────────────────
 
 func _build_veg_types() -> void:
 	_veg_types.clear()
+	var base := "res://assets/level/placeholders/"
 
 	# --- FLAT TO GENTLE SLOPES (grasslands, meadows) ---
-	_veg_types.append(_veg("TallGrass", _crossed_quad(0.15, 0.5),
-		_shader_mat(SHADER_GRASS, {}),
-		Vector2(0.7, 1.3), 0.0, 25.0, 0.0, 0.7, 1.5))
-	_veg_types.append(_veg("Wildflower", _crossed_quad(0.2, 0.3),
-		_shader_mat(SHADER_WILDFLOWER, {}),
-		Vector2(0.6, 1.0), 0.0, 20.0, 0.05, 0.6, 0.6))
-	_veg_types.append(_veg("Blueberry", _crossed_quad(0.35, 0.3),
-		_shader_mat(SHADER_BUSH, {
-			"leaf_color_a": Color(0.12, 0.28, 0.12),
-			"leaf_color_b": Color(0.20, 0.36, 0.15),
-			"berry_color": Color(0.18, 0.08, 0.32),
-			"berry_amount": 0.25,
-		}),
-		Vector2(0.7, 1.2), 0.0, 30.0, 0.15, 0.75, 0.5))
+	_add_veg("TallGrass", base + "tall_grass_clump.tscn",
+		Vector2(0.7, 1.3), 0.0, 25.0, 0.0, 0.7, 1.5)
+	_add_veg("GrassPatch", base + "grass_patch.tscn",
+		Vector2(0.5, 1.0), 0.0, 20.0, 0.0, 0.6, 1.0)
+	_add_veg("Wildflower", base + "wildflower_cluster.tscn",
+		Vector2(0.6, 1.0), 0.0, 20.0, 0.05, 0.6, 0.6)
+	_add_veg("Blueberry", base + "blueberry_shrub.tscn",
+		Vector2(0.7, 1.2), 0.0, 25.0, 0.15, 0.70, 0.4)
+	_add_veg("Fern", base + "fern_cluster.tscn",
+		Vector2(0.6, 1.2), 0.0, 30.0, 0.05, 0.65, 0.7)
+	_add_veg("Bracken", base + "bracken_fern.tscn",
+		Vector2(0.7, 1.3), 0.0, 35.0, 0.10, 0.70, 0.4)
 
 	# --- MODERATE SLOPES (shrubland) ---
-	_veg_types.append(_veg("Heather", _crossed_quad(0.5, 0.2),
-		_shader_mat(SHADER_HEATHER, {}),
-		Vector2(0.8, 1.5), 10.0, 45.0, 0.3, 0.95, 0.8))
-	_veg_types.append(_veg("Juniper", _crossed_quad(0.5, 0.45),
-		_shader_mat(SHADER_BUSH, {
-			"leaf_color_a": Color(0.10, 0.25, 0.15),
-			"leaf_color_b": Color(0.15, 0.32, 0.18),
-			"berry_color": Color(0.12, 0.15, 0.30),
-			"berry_amount": 0.1,
-		}),
-		Vector2(0.8, 1.6), 5.0, 40.0, 0.1, 0.8, 0.7))
-	_veg_types.append(_veg("Fern", _crossed_quad(0.4, 0.35),
-		_shader_mat(SHADER_FERN, {}),
-		Vector2(0.6, 1.2), 5.0, 35.0, 0.05, 0.65, 0.9))
-	_veg_types.append(_veg("Bracken", _crossed_quad(0.5, 0.4),
-		_shader_mat(SHADER_FERN, {
-			"frond_color_a": Color(0.28, 0.38, 0.08),
-			"frond_color_b": Color(0.35, 0.42, 0.12),
-		}),
-		Vector2(0.7, 1.3), 15.0, 50.0, 0.1, 0.7, 0.4))
+	_add_veg("Heather", base + "heather_patch.tscn",
+		Vector2(0.8, 1.5), 10.0, 40.0, 0.15, 0.90, 0.8)
+	_add_veg("Juniper", base + "juniper_bush.tscn",
+		Vector2(0.8, 1.6), 5.0, 35.0, 0.10, 0.80, 0.5)
+	_add_veg("Bush", base + "bush.tscn",
+		Vector2(0.7, 1.4), 5.0, 30.0, 0.10, 0.75, 0.4)
 
-	# --- STEEP SLOPES (rocky, sparse) ---
-	_veg_types.append(_veg("Moss", _flat_quad(0.6),
-		_shader_mat(SHADER_MOSS, {"lichen_blend": 0.0}),
-		Vector2(0.8, 1.5), 25.0, 60.0, 0.0, 1.0, 0.6))
-	_veg_types.append(_veg("Lichen", _flat_quad(0.4),
-		_shader_mat(SHADER_MOSS, {"lichen_blend": 1.0}),
-		Vector2(0.6, 1.4), 30.0, 65.0, 0.2, 1.0, 0.3))
+	# --- GROUND COVER (rocky, sparse) ---
+	_add_veg("Moss", base + "moss_patch.tscn",
+		Vector2(0.8, 1.5), 0.0, 45.0, 0.0, 0.85, 0.6)
+	_add_veg("Lichen", base + "lichen_rock.tscn",
+		Vector2(0.6, 1.4), 15.0, 55.0, 0.20, 0.95, 0.3)
 
 	# --- LOW ELEVATION / WATERSIDE ---
-	_veg_types.append(_veg("Reed", _crossed_quad(0.12, 0.8),
-		_shader_mat(SHADER_REED, {}),
-		Vector2(0.8, 1.3), 0.0, 15.0, 0.0, 0.2, 0.9))
+	_add_veg("Reed", base + "reed_cluster.tscn",
+		Vector2(0.8, 1.3), 0.0, 10.0, 0.0, 0.15, 0.9)
 
 
-func _veg(veg_name: String, mesh: Mesh, mat: ShaderMaterial,
+func _add_veg(veg_name: String, scene_path: String,
 		scale_range: Vector2,
 		slope_min_deg: float, slope_max_deg: float,
 		elev_min_pct: float, elev_max_pct: float,
-		density_mult: float) -> Dictionary:
-	mesh.surface_set_material(0, mat)
-	return {
+		density_mult: float) -> void:
+	var data := _extract_mesh_from_scene(scene_path)
+	if data.is_empty():
+		push_warning("TerrainFoliage: Skipping '%s' — no mesh found in %s" % [veg_name, scene_path])
+		return
+	if data["material"]:
+		data["mesh"].surface_set_material(0, data["material"])
+	_veg_types.append({
 		"name": veg_name,
-		"mesh": mesh,
+		"mesh": data["mesh"],
+		"y_offset": data["y_offset"],
 		"scale_range": scale_range,
 		"slope_min": deg_to_rad(slope_min_deg),
 		"slope_max": deg_to_rad(slope_max_deg),
 		"elev_min": elev_min_pct,
 		"elev_max": elev_max_pct,
 		"density_mult": density_mult,
-	}
+	})
 
 
 # ── Chunk management ─────────────────────────────────────────────────────────
@@ -227,8 +238,10 @@ func _build_chunk(key: Vector2i) -> void:
 
 			var s: float = rng.randf_range(vt["scale_range"].x, vt["scale_range"].y)
 			var rot_y: float = rng.randf_range(0, TAU)
-			var basis := Basis(Vector3.UP, rot_y).scaled(Vector3(s, s, s))
-			transforms.append(Transform3D(basis, pt["pos"]))
+			var xform_basis := Basis(Vector3.UP, rot_y).scaled(Vector3(s, s, s))
+			var pos: Vector3 = pt["pos"]
+			pos.y += vt["y_offset"] * s
+			transforms.append(Transform3D(xform_basis, pos))
 
 		if transforms.is_empty():
 			continue
@@ -255,55 +268,6 @@ func _free_chunk(key: Vector2i) -> void:
 		for node: MultiMeshInstance3D in _chunks[key]:
 			node.queue_free()
 		_chunks.erase(key)
-
-
-# ── Mesh factories ───────────────────────────────────────────────────────────
-
-## Two perpendicular quads forming an X shape — standard foliage billboard.
-func _crossed_quad(half_w: float, height: float) -> ArrayMesh:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	# Quad A: facing +Z / -Z
-	_add_quad(st, Vector3(-half_w, 0, 0), Vector3(half_w, 0, 0),
-				  Vector3(half_w, height, 0), Vector3(-half_w, height, 0))
-	# Quad B: facing +X / -X (rotated 90°)
-	_add_quad(st, Vector3(0, 0, -half_w), Vector3(0, 0, half_w),
-				  Vector3(0, height, half_w), Vector3(0, height, -half_w))
-	st.generate_normals()
-	return st.commit()
-
-
-## Flat horizontal quad for ground-hugging vegetation (moss, lichen).
-func _flat_quad(half_size: float) -> ArrayMesh:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	# Slight Y offset (0.02) to avoid z-fighting with terrain
-	_add_quad(st, Vector3(-half_size, 0.02, -half_size),
-				  Vector3( half_size, 0.02, -half_size),
-				  Vector3( half_size, 0.02,  half_size),
-				  Vector3(-half_size, 0.02,  half_size))
-	st.generate_normals()
-	return st.commit()
-
-
-func _add_quad(st: SurfaceTool, bl: Vector3, br: Vector3, tr: Vector3, tl: Vector3) -> void:
-	# Triangle 1: bl, br, tr
-	st.set_uv(Vector2(0, 1)); st.add_vertex(bl)
-	st.set_uv(Vector2(1, 1)); st.add_vertex(br)
-	st.set_uv(Vector2(1, 0)); st.add_vertex(tr)
-	# Triangle 2: bl, tr, tl
-	st.set_uv(Vector2(0, 1)); st.add_vertex(bl)
-	st.set_uv(Vector2(1, 0)); st.add_vertex(tr)
-	st.set_uv(Vector2(0, 0)); st.add_vertex(tl)
-
-
-## Create a ShaderMaterial from a shader with optional parameter overrides.
-func _shader_mat(shader: Shader, params: Dictionary) -> ShaderMaterial:
-	var mat := ShaderMaterial.new()
-	mat.shader = shader
-	for key: String in params:
-		mat.set_shader_parameter(key, params[key])
-	return mat
 
 
 # ── Utility ──────────────────────────────────────────────────────────────────

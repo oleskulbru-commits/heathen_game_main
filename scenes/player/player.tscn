@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" uid="uid://bqcrejaas6xtu" path="res://scripts/player/player_controller.gd" id="1_player_script"]
 [ext_resource type="PackedScene" uid="uid://bp3a0degmc061" path="res://scenes/xbots/xbot_root.tscn" id="2_dovo2"]
+[ext_resource type="Script" path="res://scripts/player/light_probe.gd" id="3_light_probe"]
+[ext_resource type="Script" path="res://scripts/player/ability_system.gd" id="4_ability"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_dovo2"]
 radius = 0.30078125
@@ -28,3 +30,9 @@ spring_length = 3.0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
 current = true
 fov = 54.0
+
+[node name="LightProbe" type="Node" parent="."]
+script = ExtResource("3_light_probe")
+
+[node name="AbilitySystem" type="Node" parent="."]
+script = ExtResource("4_ability")

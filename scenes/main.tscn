@@ -3,67 +3,82 @@
 [ext_resource type="Script" uid="uid://y1b70r1hwt4h" path="res://scripts/game/game.gd" id="1_game_script"]
 [ext_resource type="PackedScene" uid="uid://c53k8f3mrqmui" path="res://scenes/player/player.tscn" id="2_0wfyh"]
 [ext_resource type="Script" uid="uid://cib2rig7vup10" path="res://addons/terrain_3d/tools/importer.gd" id="3_sugp2"]
-[ext_resource type="PackedScene" uid="uid://c6a7kqmwiipkx" path="res://scenes/enemies/bandit.tscn" id="4_jyhfs"]
-[ext_resource type="Script" uid="uid://cqb3aydmasiy" path="res://scripts/game/terrain_foliage.gd" id="5_foliage"]
+[ext_resource type="PackedScene" uid="uid://c6a7kqmwiipkx" path="res://scenes/enemies/bandits/bandit_sword.tscn" id="4_jyhfs"]
+[ext_resource type="Texture2D" uid="uid://hw7c1raysfqs" path="res://assets/enviroment_textures/Ground_Forest_tjmhfcjl_2K_surface_ms/tjmhfcjl_2K_Albedo.jpg" id="4_vxglm"]
+[ext_resource type="Texture2D" uid="uid://b1ramrfgf4k4a" path="res://assets/enviroment_textures/Rock_Cliff_vl1lbbylw_2K_surface_ms/vl1lbbylw_2K_Albedo.jpg" id="4_y6deb"]
+[ext_resource type="Shader" uid="uid://bf3x8d4a56e2k" path="res://assets/shaders/terrain_procedural.gdshader" id="4_yc10j"]
+[ext_resource type="Texture2D" uid="uid://brtt6xb8s82p5" path="res://assets/enviroment_textures/Ground_Forest_tjmhfcjl_2K_surface_ms/tjmhfcjl_2K_Normal.jpg" id="5_2f3dj"]
+[ext_resource type="Texture2D" uid="uid://ccxasxll3lxqw" path="res://assets/enviroment_textures/Rock_Cliff_vl1lbbylw_2K_surface_ms/vl1lbbylw_2K_Normal.jpg" id="5_og1vs"]
+[ext_resource type="Texture2D" uid="uid://wks5yns7fv6x" path="res://assets/enviroment_textures/Rock_Cliff_vl1lbbylw_2K_surface_ms/vl1lbbylw_2K_Roughness.jpg" id="6_2wyq8"]
 [ext_resource type="PackedScene" path="res://assets/level/placeholders/path_segment.tscn" id="6_jbj1t"]
+[ext_resource type="Texture2D" uid="uid://djb30g4wrkj3w" path="res://assets/enviroment_textures/Ground_Forest_tjmhfcjl_2K_surface_ms/tjmhfcjl_2K_Roughness.jpg" id="6_yq6so"]
 [ext_resource type="Script" uid="uid://bj4rrip11tc6i" path="res://scripts/game/day_night_cycle.gd" id="7_daynight"]
+[ext_resource type="Texture2D" uid="uid://c1ujnkbh3m8hh" path="res://assets/enviroment_textures/Grass_Wild_pjvuH0_2K_surface_ms/pjvuH_2K_Albedo.jpg" id="7_dgi5k"]
+[ext_resource type="Texture2D" uid="uid://ca0egxj2cyyqe" path="res://assets/enviroment_textures/Ground_Forest_xeunbh1_2K_surface_ms/xeunbh1_2K_Albedo.jpg" id="7_fv21b"]
+[ext_resource type="Texture2D" uid="uid://4rhhwj3wgcg0" path="res://assets/enviroment_textures/Grass_Wild_pjvuH0_2K_surface_ms/pjvuH_2K_Normal.jpg" id="8_j8jky"]
 [ext_resource type="PackedScene" uid="uid://b742ktmlp1hjo" path="res://scenes/levels/ocean.tscn" id="8_ocean"]
+[ext_resource type="Texture2D" uid="uid://cd11cy0oxcpam" path="res://assets/enviroment_textures/Ground_Forest_xeunbh1_2K_surface_ms/xeunbh1_2K_Normal.jpg" id="8_tel4y"]
 [ext_resource type="PackedScene" path="res://assets/level/placeholders/dock.tscn" id="8_tipki"]
 [ext_resource type="PackedScene" path="res://assets/level/placeholders/cottage.tscn" id="9_85g3d"]
+[ext_resource type="Texture2D" uid="uid://c4fqptx6wge27" path="res://assets/enviroment_textures/Grass_Wild_pjvuH0_2K_surface_ms/pjvuH_2K_Roughness.jpg" id="9_kmb1v"]
+[ext_resource type="Texture2D" uid="uid://cpheacxcwqsrx" path="res://assets/enviroment_textures/Ground_Forest_xeunbh1_2K_surface_ms/xeunbh1_2K_Roughness.jpg" id="9_qkpxi"]
 [ext_resource type="PackedScene" path="res://assets/level/placeholders/log.tscn" id="10_choun"]
 [ext_resource type="PackedScene" path="res://assets/level/placeholders/cart.tscn" id="11_ya4ey"]
 [ext_resource type="PackedScene" path="res://assets/level/placeholders/barrel.tscn" id="12_trceg"]
+[ext_resource type="Texture2D" uid="uid://c5l074cdof2jl" path="res://assets/enviroment_textures/Snow_Pure_uewpai2fw_2K_surface_ms/uewpai2fw_2K_Albedo.jpg" id="13_5q0nq"]
 [ext_resource type="PackedScene" path="res://assets/level/placeholders/crate.tscn" id="13_a8y0u"]
 [ext_resource type="PackedScene" path="res://assets/level/placeholders/field_overgrown.tscn" id="14_a8y0u"]
+[ext_resource type="Texture2D" uid="uid://ciwvoa4nvnx2t" path="res://assets/enviroment_textures/Snow_Pure_uewpai2fw_2K_surface_ms/uewpai2fw_2K_Normal.jpg" id="14_dgi5k"]
+[ext_resource type="Texture2D" uid="uid://iddgtmc8nyx6" path="res://assets/enviroment_textures/Snow_Pure_uewpai2fw_2K_surface_ms/uewpai2fw_2K_Roughness.jpg" id="15_j8jky"]
 [ext_resource type="PackedScene" path="res://assets/level/placeholders/longhouse.tscn" id="15_jkv2x"]
 [ext_resource type="PackedScene" path="res://assets/level/placeholders/smithy.tscn" id="17_muem4"]
+[ext_resource type="PackedScene" uid="uid://boh3dpq3gx06x" path="res://assets/level/placeholders/standing_torch.tscn" id="18_torch"]
+[ext_resource type="PackedScene" uid="uid://43snob725tfs" path="res://scenes/ui/hud.tscn" id="19_hud"]
+[ext_resource type="Script" uid="uid://brh8x1wnycrl5" path="res://demo/src/RuntimeNavigationBaker.gd" id="20_navbaker"]
+[ext_resource type="PackedScene" uid="uid://dfpatff4d5okj" path="res://addons/godot_3d_cursor/scenes/3d_cursor.tscn" id="34_j8jky"]
 
 [sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_env01"]
 rayleigh_color = Color(0.26, 0.41, 0.58, 1)
 mie_coefficient = 0.003
 mie_color = Color(0.69, 0.73, 0.73, 1)
-sun_disk_scale = 10.0
-ground_color = Color(0.15, 0.12, 0.06, 1)
 
 [sub_resource type="Sky" id="Sky_env01"]
 sky_material = SubResource("PhysicalSkyMaterial_env01")
 process_mode = 1
-radiance_size = 4
+radiance_size = 5
 
 [sub_resource type="Environment" id="Environment_env01"]
 background_mode = 2
+background_energy_multiplier = 4.09
 sky = SubResource("Sky_env01")
 ambient_light_source = 3
 reflected_light_source = 2
 tonemap_mode = 3
-tonemap_exposure = 1.2
-tonemap_white = 5.0
 ssr_enabled = true
 ssao_enabled = true
-ssao_radius = 3.0
-ssao_intensity = 2.5
-ssao_power = 1.8
-ssao_horizon = 0.1
-ssao_sharpness = 0.9
-ssao_light_affect = 0.6
+ssao_power = 1.2
+ssao_detail = 0.6
+ssao_horizon = 0.08
+ssao_sharpness = 0.95
 ssil_enabled = true
-ssil_intensity = 1.2
+ssil_radius = 6.0
+ssil_sharpness = 0.95
+ssil_normal_rejection = 1.2
 sdfgi_enabled = true
 sdfgi_use_occlusion = true
-sdfgi_bounce_feedback = 0.8
+sdfgi_bounce_feedback = 0.9
 sdfgi_cascades = 6
-sdfgi_energy = 1.4
-glow_enabled = true
+sdfgi_energy = 1.6
 glow_normalized = true
-glow_intensity = 0.4
-glow_strength = 0.8
+glow_intensity = 0.45
+glow_strength = 0.85
 glow_bloom = 0.08
+glow_hdr_threshold = 0.8
 fog_enabled = true
 fog_light_color = Color(0.7, 0.75, 0.85, 1)
 fog_light_energy = 0.7
 fog_sun_scatter = 0.15
 fog_density = 0.0005
-fog_aerial_perspective = 0.5
 fog_sky_affect = 0.6
 fog_height = -20.0
 fog_height_density = 0.025
@@ -71,61 +86,93 @@ volumetric_fog_enabled = true
 volumetric_fog_density = 0.006
 volumetric_fog_albedo = Color(0.7, 0.75, 0.85, 1)
 volumetric_fog_emission = Color(0.35, 0.38, 0.43, 1)
-volumetric_fog_emission_energy = 0.04
-volumetric_fog_gi_inject = 0.5
-volumetric_fog_anisotropy = 0.5
+volumetric_fog_emission_energy = 0.0
+volumetric_fog_gi_inject = 0.8
+volumetric_fog_anisotropy = 0.6
 volumetric_fog_length = 250.0
-volumetric_fog_sky_affect = 0.3
-adjustment_enabled = true
-adjustment_contrast = 1.08
+volumetric_fog_sky_affect = 0.0
+adjustment_contrast = 1.06
+adjustment_saturation = 1.05
 
 [sub_resource type="CameraAttributesPractical" id="CameraAttributes_env01"]
 auto_exposure_enabled = true
-auto_exposure_speed = 1.5
-auto_exposure_min_sensitivity = 25.0
-auto_exposure_max_sensitivity = 400.0
-
-[sub_resource type="Gradient" id="Gradient_tefeu"]
-offsets = PackedFloat32Array(0.2, 1)
-colors = PackedColorArray(1, 1, 1, 1, 0, 0, 0, 1)
-
-[sub_resource type="FastNoiseLite" id="FastNoiseLite_o6xl0"]
-noise_type = 2
-frequency = 0.03
-cellular_jitter = 3.0
-cellular_return_type = 0
-domain_warp_enabled = true
-domain_warp_type = 1
-domain_warp_amplitude = 50.0
-domain_warp_fractal_type = 2
-domain_warp_fractal_lacunarity = 1.5
-domain_warp_fractal_gain = 1.0
-
-[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_tipki"]
-noise = SubResource("FastNoiseLite_o6xl0")
-color_ramp = SubResource("Gradient_tefeu")
-seamless = true
+auto_exposure_speed = 1.2
+auto_exposure_min_sensitivity = 50.0
 
 [sub_resource type="Terrain3DMaterial" id="Terrain3DMaterial_o6xl0"]
 _shader_parameters = {
-&"bias_distance": 512.0,
-&"blend_sharpness": 0.5,
-&"depth_blur": 0.0,
-&"enable_macro_variation": true,
-&"enable_projection": true,
+&"DebugTools": null,
+&"DirtTextures": null,
+&"GrassTextures": null,
+&"HeightZones": null,
+&"MossTextures": null,
+&"RockTextures": null,
+&"SlopeThresholds": null,
+&"SnowTextures": null,
+&"SurfaceColors": null,
+&"Variation": null,
+&"alpine_color": Color(0.28, 0.34, 0.14, 1),
+&"alpine_start": 55.0,
+&"cliff_face_color": Color(0.16, 0.15, 0.14, 1),
+&"cliff_slope": 0.42,
+&"debug_flat_albedo": false,
+&"dirt_albedo_tex": ExtResource("4_vxglm"),
+&"dirt_amount": 0.25,
+&"dirt_color": Color(0.35, 0.26, 0.14, 1),
+&"dirt_normal_strength": 1.0,
+&"dirt_normal_tex": ExtResource("5_2f3dj"),
+&"dirt_roughness_tex": ExtResource("6_yq6so"),
+&"dirt_uv_scale": 0.25,
 &"flat_terrain_normals": false,
-&"macro_variation1": Color(1, 1, 1, 1),
-&"macro_variation2": Color(1, 1, 1, 1),
-&"macro_variation_slope": 0.333,
-&"mipmap_bias": 1.0,
-&"noise1_angle": 0.0,
-&"noise1_offset": Vector2(0.5, 0.5),
-&"noise1_scale": 0.04,
-&"noise2_scale": 0.076,
-&"noise_texture": SubResource("NoiseTexture2D_tipki"),
-&"projection_threshold": 0.8
+&"grass_albedo_tex": ExtResource("7_dgi5k"),
+&"grass_dark": Color(0.12, 0.22, 0.05, 1),
+&"grass_dirt_spread": 0.6,
+&"grass_end": 80.0,
+&"grass_light": Color(0.25, 0.4, 0.12, 1),
+&"grass_moss_amount": 0.35,
+&"grass_normal_strength": 1.0,
+&"grass_normal_tex": ExtResource("8_j8jky"),
+&"grass_roughness_tex": ExtResource("9_kmb1v"),
+&"grass_slope_max": 0.9430000210425,
+&"grass_uv_scale": 0.25,
+&"height_noise_amp": 15.0,
+&"moss_albedo_tex": ExtResource("7_fv21b"),
+&"moss_amount": 0.5,
+&"moss_normal_strength": 1.0,
+&"moss_normal_tex": ExtResource("8_tel4y"),
+&"moss_roughness_tex": ExtResource("9_qkpxi"),
+&"moss_tint": Color(0.2, 0.3, 0.1, 1),
+&"moss_uv_scale": 0.25,
+&"noise_scale": 0.008,
+&"rock_albedo_tex": ExtResource("4_y6deb"),
+&"rock_dark_color": Color(0.22, 0.21, 0.19, 1),
+&"rock_light_color": Color(0.44, 0.42, 0.38, 1),
+&"rock_normal_strength": 1.0,
+&"rock_normal_tex": ExtResource("5_og1vs"),
+&"rock_roughness_tex": ExtResource("6_2wyq8"),
+&"rock_slope_start": 0.7,
+&"rock_triplanar_sharpness": 8.0,
+&"rock_uv_scale": 0.01399999996648,
+&"slope_noise_amp": 0.12,
+&"snow_albedo_tex": ExtResource("13_5q0nq"),
+&"snow_full": 182.222003905545,
+&"snow_normal_strength": 1.0,
+&"snow_normal_tex": ExtResource("14_dgi5k"),
+&"snow_roughness_tex": ExtResource("15_j8jky"),
+&"snow_slope_min": 0.7,
+&"snow_start": 144.53700306550752,
+&"snow_surface": Color(0.88, 0.9, 0.93, 1),
+&"snow_uv_scale": 0.2,
+&"tree_line": 110.0,
+&"use_dirt_textures": true,
+&"use_grass_textures": true,
+&"use_moss_textures": true,
+&"use_rock_textures": true,
+&"use_snow_textures": false,
+&"valley_floor": 0.7850000372875
 }
-show_checkered = true
+shader_override_enabled = true
+shader_override = ExtResource("4_yc10j")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tipki"]
 transparency = 4
@@ -148,8 +195,16 @@ lod0_range = 128.0
 [sub_resource type="Terrain3DAssets" id="Terrain3DAssets_choun"]
 mesh_list = Array[Terrain3DMeshAsset]([SubResource("Terrain3DMeshAsset_85g3d")])
 
+[sub_resource type="NavigationMesh" id="NavigationMesh_bandit"]
+geometry_parsed_geometry_type = 1
+agent_height = 2.0
+agent_radius = 0.35
+agent_max_slope = 30.0
+
 [node name="Game" type="Node3D" unique_id=1851250230]
 script = ExtResource("1_game_script")
+
+[node name="HUD" parent="." unique_id=1277128930 instance=ExtResource("19_hud")]
 
 [node name="Lighting" type="Node3D" parent="." unique_id=245501532]
 
@@ -160,11 +215,12 @@ light_indirect_energy = 1.8
 light_volumetric_fog_energy = 0.8
 light_angular_distance = 3.0
 shadow_enabled = true
-shadow_bias = 0.02
-shadow_blur = 2.5
-directional_shadow_split_1 = 0.05
-directional_shadow_split_2 = 0.15
-directional_shadow_max_distance = 500.0
+shadow_bias = 0.015
+shadow_blur = 1.5
+directional_shadow_split_1 = 0.04
+directional_shadow_split_2 = 0.12
+directional_shadow_split_3 = 0.35
+directional_shadow_max_distance = 600.0
 sky_mode = 1
 
 [node name="FillLight" type="DirectionalLight3D" parent="Lighting" unique_id=628948499]
@@ -179,6 +235,12 @@ camera_attributes = SubResource("CameraAttributes_env01")
 
 [node name="DayNightCycle" type="Node" parent="Lighting" unique_id=1082741242]
 script = ExtResource("7_daynight")
+time_of_day = 22.0
+
+[node name="VoxelGI" type="VoxelGI" parent="Lighting" unique_id=890869004]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6643, 5, 9018)
+subdiv = 2
+size = Vector3(80, 20, 60)
 
 [node name="World" type="Node3D" parent="." unique_id=1414712084]
 
@@ -187,17 +249,12 @@ data_directory = "res://assets/level"
 material = SubResource("Terrain3DMaterial_o6xl0")
 assets = SubResource("Terrain3DAssets_choun")
 vertex_spacing = 2.0
-show_checkered = true
 top_level = true
 script = ExtResource("3_sugp2")
 height_file_name = "C:/Users/olema/OneDrive/projects/2026/Heathen_Prototype/assets/heightmaps/rogaland_10K0000.exr"
 import_position = Vector2i(-5120, -5120)
 import_scale = 0.4
 metadata/_edit_lock_ = true
-
-[node name="TerrainFoliage" type="Node3D" parent="World" unique_id=302830105]
-script = ExtResource("5_foliage")
-density = 1.0
 
 [node name="Ocean" parent="World" unique_id=990331587 instance=ExtResource("8_ocean")]
 
@@ -208,50 +265,87 @@ transform = Transform3D(0.2043423, 0, 0.9788995, -0.10327433, 0.9944193, 0.02155
 
 [node name="Settlements" type="Node3D" parent="Levels" unique_id=2077427986]
 
-[node name="Frafjord" type="Node3D" parent="Levels/Settlements" unique_id=1426585751]
+[node name="Frafjord" type="Node3D" parent="Levels/Settlements" unique_id=901085818]
+transform = Transform3D(0.67575747, 0, -0.73712397, 0, 1, 0, 0.73712397, 0, 0.67575747, 6604.8613, 0, 9005.524)
 
 [node name="Dock" parent="Levels/Settlements/Frafjord" unique_id=964452339 instance=ExtResource("8_tipki")]
-transform = Transform3D(0.9383061, 0, -0.34580594, 0, 1, 0, 0.34580594, 0, 0.9383061, 6669.169, 0.011640549, 9002.493)
+transform = Transform3D(0.8889693, 0, 0.45796698, 0, 1, 0, -0.45796698, 0, 0.8889693, 41.222656, 0.011640549, -49.45117)
 
 [node name="Dock2" parent="Levels/Settlements/Frafjord" unique_id=1855277452 instance=ExtResource("8_tipki")]
-transform = Transform3D(0.9383061, 0, -0.34580594, 0, 1, 0, 0.34580594, 0, 0.9383061, 6669.8237, 0.007929325, 9000.758)
+transform = Transform3D(0.8889693, 0, 0.45796698, 0, 1, 0, -0.45796698, 0, 0.8889693, 40.385742, 0.007929325, -51.105957)
 
 [node name="Cottage" parent="Levels/Settlements/Frafjord" unique_id=1229027032 instance=ExtResource("9_85g3d")]
-transform = Transform3D(0.21091539, 0, 0.9775044, 0, 1, 0, -0.9775044, 0, 0.21091539, 6661.099, 2.4042287, 9011.898)
+transform = Transform3D(-0.5780143, 0, 0.81602675, 0, 1, 0, -0.81602675, 0, -0.5780143, 42.70215, 2.4042287, -37.146484)
 
 [node name="Bandit" parent="Levels/Settlements/Frafjord" unique_id=1145995685 instance=ExtResource("4_jyhfs")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6620.522, 1.9471779, 9033.587)
+transform = Transform3D(0.6757575, 0, 0.737124, 0, 1, 0, -0.737124, 0, 0.6757575, 30.830078, 1.965761, 7.0166016)
 
-[node name="Bandit2" parent="Levels/Settlements/Frafjord" unique_id=1182602049 instance=ExtResource("4_jyhfs")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6629.3257, 1.9090843, 9004.074)
+[node name="Torches" type="Node3D" parent="Levels/Settlements/Frafjord" unique_id=1355762678]
+transform = Transform3D(0.6757575, 0, 0.737124, 0, 1, 0, -0.737124, 0, 0.6757575, -11101.473, 0, -1216.9487)
 
-[node name="Bandit3" parent="Levels/Settlements/Frafjord" unique_id=1386817533 instance=ExtResource("4_jyhfs")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6647.81, 2.6594796, 9019.417)
+[node name="Torch_Longhouse1" parent="Levels/Settlements/Frafjord/Torches" unique_id=1515845372 instance=ExtResource("18_torch")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6620, 1.8224587, 9030.437)
+
+[node name="Torch_Longhouse2" parent="Levels/Settlements/Frafjord/Torches" unique_id=1167862458 instance=ExtResource("18_torch")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6625, 2.918414, 9045.24)
+
+[node name="Torch_Cottage" parent="Levels/Settlements/Frafjord/Torches" unique_id=1157240775 instance=ExtResource("18_torch")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6645.8286, 2.99644, 9031.756)
+
+[node name="Torch_Smithy" parent="Levels/Settlements/Frafjord/Torches" unique_id=261656920 instance=ExtResource("18_torch")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6628, 1.7, 9006.541)
+
+[node name="Torch_Dock" parent="Levels/Settlements/Frafjord/Torches" unique_id=2030807977 instance=ExtResource("18_torch")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6667, 0.3, 9005)
+
+[node name="Torch_Supplies" parent="Levels/Settlements/Frafjord/Torches" unique_id=1396133404 instance=ExtResource("18_torch")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6664, 2.7, 9015)
+
+[node name="Torch_Path" parent="Levels/Settlements/Frafjord/Torches" unique_id=1732903219 instance=ExtResource("18_torch")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6645, 2.634994, 9018)
+
+[node name="Torch_Mid" parent="Levels/Settlements/Frafjord/Torches" unique_id=1895026066 instance=ExtResource("18_torch")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6638, 2, 9012)
+
+[node name="Log" parent="Levels/Settlements/Frafjord" unique_id=375041679 instance=ExtResource("10_choun")]
+transform = Transform3D(0.9872921, 0, 0.1589163, 0, 1, 0, -0.1589163, 0, 0.9872921, 45.935547, 2.6504045, -33.784668)
+
+[node name="Cart" parent="Levels/Settlements/Frafjord" unique_id=459797182 instance=ExtResource("11_ya4ey")]
+transform = Transform3D(0.91199136, 0, 0.4102096, 0, 1, 0, -0.4102096, 0, 0.91199136, 47.118164, 2.5707424, -32.822266)
+
+[node name="Barrel" parent="Levels/Settlements/Frafjord" unique_id=37508885 instance=ExtResource("12_trceg")]
+transform = Transform3D(0.6757575, 0, 0.737124, 0, 1, 0, -0.737124, 0, 0.6757575, 45.753906, 2.7181456, -36.39795)
+
+[node name="Crate" parent="Levels/Settlements/Frafjord" unique_id=1438554472 instance=ExtResource("13_a8y0u")]
+transform = Transform3D(0.6757575, 0, 0.737124, 0, 1, 0, -0.737124, 0, 0.6757575, 45.566406, 2.7245483, -37.111816)
+
+[node name="FieldOvergrown" parent="Levels/Settlements/Frafjord" unique_id=1902961378 instance=ExtResource("14_a8y0u")]
+transform = Transform3D(1.6221926, 0, 1.1439916, 0, 1.9849998, 0, -1.1439916, 0, 1.6221926, 33.916992, 2.5643616, -24.618652)
+
+[node name="Longhouse" parent="Levels/Settlements/Frafjord" unique_id=630378881 instance=ExtResource("15_jkv2x")]
+transform = Transform3D(0.6757575, 0, 0.737124, 0, 1, 0, -0.737124, 0, 0.6757575, 34.878906, 2.1052241, 7.998535)
+
+[node name="Smithy" parent="Levels/Settlements/Frafjord" unique_id=1867471841 instance=ExtResource("17_muem4")]
+transform = Transform3D(0.94489753, 0, 0.3273663, 0, 1, 0, -0.3273663, 0, 0.94489753, 12.462891, 1.6637712, -19.01416)
 
 [node name="Characters" type="Node3D" parent="." unique_id=592048963]
 
 [node name="Player" parent="Characters" unique_id=731287834 instance=ExtResource("2_0wfyh")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6607.347, 1.3534615, 8991.426)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6650.0903, 3.1358743, 9044.724)
 
-[node name="Log" parent="." unique_id=375041679 instance=ExtResource("10_choun")]
-transform = Transform3D(0.78431106, 0, -0.6203678, 0, 1, 0, 0.6203678, 0, 0.78431106, 6660.8057, 2.6504045, 9016.554)
+[node name="RuntimeNavigationBaker" type="Node" parent="." unique_id=589365160 node_paths=PackedStringArray("terrain", "player")]
+script = ExtResource("20_navbaker")
+template = SubResource("NavigationMesh_bandit")
+terrain = NodePath("../World/Terrain3D")
+player = NodePath("../Characters/Player")
+log_timing = true
 
-[node name="Cart" parent="." unique_id=459797182 instance=ExtResource("11_ya4ey")]
-transform = Transform3D(0.9186603, 0, -0.3950485, 0, 1, 0, 0.3950485, 0, 0.9186603, 6660.896, 2.5707424, 9018.076)
-
-[node name="Barrel" parent="." unique_id=37508885 instance=ExtResource("12_trceg")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6662.61, 2.7181456, 9014.654)
-
-[node name="Crate" parent="." unique_id=1438554472 instance=ExtResource("13_a8y0u")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6663.009, 2.7245483, 9014.033)
-
-[node name="FieldOvergrown" parent="." unique_id=1902961378 instance=ExtResource("14_a8y0u")]
-transform = Transform3D(1.9394724, 0, -0.42269614, 0, 1.9849998, 0, 0.42269614, 0, 1.9394724, 6645.9277, 2.5643616, 9013.889)
-
-[node name="Longhouse" parent="." unique_id=630378881 instance=ExtResource("15_jkv2x")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6622.5347, 2.1052241, 9036.639)
-
-[node name="Smithy" parent="." unique_id=1867471841 instance=ExtResource("17_muem4")]
-transform = Transform3D(0.87983114, 0, -0.47528642, 0, 1, 0, 0.47528642, 0, 0.87983114, 6627.299, 1.6637712, 9001.861)
+[node name="3DCursor" parent="." unique_id=1168684601 instance=ExtResource("34_j8jky")]
+metadata/cursor_id = 0
+metadata/size_scale = 1.0
+metadata/show_title_label = true
+metadata/show_number_label = true
+metadata/scale_affect_labels = true
+metadata/_edit_lock_ = true
 
 [editable path="World/Ocean"]

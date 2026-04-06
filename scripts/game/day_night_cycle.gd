@@ -8,6 +8,7 @@ extends Node
 
 var _sun: DirectionalLight3D
 var _fill: DirectionalLight3D
+var _moon: DirectionalLight3D
 var _env: Environment
 var _sky: PhysicalSkyMaterial
 
@@ -16,6 +17,15 @@ func _ready() -> void:
 	var root := get_parent()
 	_sun = root.get_node("DirectionalLight3D")
 	_fill = root.get_node("FillLight")
+	_moon = root.get_node_or_null("MoonLight")
+	if not _moon:
+		_moon = DirectionalLight3D.new()
+		_moon.name = "MoonLight"
+		_moon.shadow_enabled = true
+		_moon.shadow_blur = 3.0
+		_moon.directional_shadow_max_distance = 200.0
+		_moon.light_angular_distance = 0.3
+		root.add_child.call_deferred(_moon)
 	_env = (root.get_node("WorldEnvironment") as WorldEnvironment).environment
 	_sky = _env.sky.sky_material as PhysicalSkyMaterial
 	_tick(time_of_day)
@@ -52,11 +62,25 @@ func _tick(t: float) -> void:
 		_fill.light_energy = lerpf(0.2, 0.5, h)
 		_fill.light_color = Color(0.6, 0.65, 0.85).lerp(Color(0.75, 0.8, 0.95), h)
 	else:
-		_fill.light_energy = lerpf(0.08, 0.02, h)
-		_fill.light_color = Color(0.25, 0.3, 0.5)
+		_fill.light_energy = lerpf(0.08, 0.04, h)
+		_fill.light_color = Color(0.3, 0.35, 0.55)
+
+	# ── Moonlight (opposite the sun) ────────────────────────────────
+	var moon_angle := sun_angle + PI
+	_moon.rotation.x = -moon_angle
+	if above:
+		# Moon barely visible during the day
+		_moon.light_energy = 0.0
+		_moon.visible = false
+	else:
+		_moon.visible = true
+		_moon.light_color = Color(0.45, 0.5, 0.7)
+		_moon.light_energy = lerpf(0.08, 0.18, h)
+		_moon.light_indirect_energy = lerpf(0.2, 0.5, h)
+		_moon.light_volumetric_fog_energy = 0.3
 
 	# ── Sky material ────────────────────────────────────────────────
-	_sky.energy_multiplier = lerpf(0.05, 1.0, smoothstep(-0.15, 0.2, elev))
+	_sky.energy_multiplier = lerpf(0.12, 1.0, smoothstep(-0.15, 0.2, elev))
 
 	if above and h < 0.6:
 		# Warm violet tint at sunrise / sunset
@@ -90,11 +114,16 @@ func _tick(t: float) -> void:
 		_env.volumetric_fog_emission_energy = 0.02
 
 	# ── Ambient & glow ──────────────────────────────────────────────
-	_env.ambient_light_energy = lerpf(0.25, 0.8, smoothstep(-0.15, 0.2, elev))
+	# Stars and moon provide a base ambient floor at night
+	_env.ambient_light_energy = lerpf(0.35, 0.8, smoothstep(-0.15, 0.2, elev))
+	if not above:
+		_env.ambient_light_color = Color(0.3, 0.35, 0.55)
+	else:
+		_env.ambient_light_color = Color(1, 1, 1)
 
 	if above:
 		_env.glow_bloom = lerpf(0.12, 0.06, h)
 		_env.glow_intensity = lerpf(0.5, 0.3, h)
 	else:
-		_env.glow_bloom = 0.05
-		_env.glow_intensity = 0.25
+		_env.glow_bloom = 0.07
+		_env.glow_intensity = 0.3

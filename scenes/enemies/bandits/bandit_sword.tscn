@@ -1,0 +1,128 @@
+[gd_scene format=3 uid="uid://c6a7kqmwiipkx"]
+
+[ext_resource type="Script" uid="uid://cqypn0kkngjl7" path="res://scripts/enemies/bandit_controller.gd" id="1_bandit_script"]
+[ext_resource type="PackedScene" uid="uid://brxwvwmv1ip30" path="res://scenes/xbots/ybot_root.tscn" id="2_ybot"]
+[ext_resource type="PackedScene" path="res://scenes/items/shortsword.tscn" id="3_08rfx"]
+[ext_resource type="Script" path="res://scripts/enemies/bandit_perception.gd" id="4_percep"]
+[ext_resource type="Script" path="res://scripts/enemies/bandit_torch_search.gd" id="6_torch"]
+[ext_resource type="Script" path="res://scripts/enemies/bandit_patrol.gd" id="7_patrol"]
+[ext_resource type="Script" path="res://scripts/enemies/bandit_debug_vision.gd" id="8_debug"]
+[ext_resource type="Script" path="res://scripts/enemies/bandit_body_detector.gd" id="9_body"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_bandit"]
+radius = 0.30078125
+height = 1.8602295
+
+[node name="Bandit" type="CharacterBody3D" unique_id=1182602049]
+collision_layer = 2
+script = ExtResource("1_bandit_script")
+groups = ["bandit"]
+
+[node name="ybot_root" parent="." unique_id=1981491901 instance=ExtResource("2_ybot")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
+
+[node name="Skeleton3D" parent="ybot_root/Armature" parent_id_path=PackedInt32Array(1981491901, 1833721024) index="0" unique_id=207116927]
+bones/0/position = Vector3(0.10832376, 0, 0.23122731)
+bones/1/position = Vector3(-0.067299776, 1.0320079, -0.006678878)
+bones/1/rotation = Quaternion(-0.0021887873, -0.049425807, -0.029532433, 0.9983387)
+bones/2/rotation = Quaternion(-0.06971937, 0.0024823707, 0.01580341, 0.99743843)
+bones/3/rotation = Quaternion(0.020980818, 0.0029132508, 0.027653892, 0.99939317)
+bones/4/rotation = Quaternion(0.03385702, 0.0032693536, 0.027614025, 0.9990399)
+bones/5/rotation = Quaternion(-0.09124513, -0.00047237347, 0.0063995183, 0.9958079)
+bones/6/position = Vector3(-1.6093237e-08, 0.09341906, 0.028410371)
+bones/6/rotation = Quaternion(0.03519327, 0.015279331, -0.046409126, 0.9981855)
+bones/8/position = Vector3(0.061058246, 0.09106266, 0.0075706085)
+bones/8/rotation = Quaternion(-0.56862175, -0.50382394, 0.538869, -0.3639381)
+bones/9/rotation = Quaternion(0.50867075, 0.20881906, 0.22276992, 0.8049983)
+bones/10/position = Vector3(1.3681219e-07, 0.2740468, 6.744997e-08)
+bones/10/rotation = Quaternion(0.0003666109, -0.004910447, 0.07434097, 0.9972208)
+bones/11/rotation = Quaternion(-0.094454944, -0.145185, 0.15640901, 0.9723867)
+bones/12/position = Vector3(-0.026817463, 0.024661902, 0.015762184)
+bones/12/rotation = Quaternion(0.21899922, -0.11900989, 0.12523857, 0.9603079)
+bones/13/rotation = Quaternion(-0.050575085, 0.017804269, -0.101031385, 0.9934374)
+bones/14/position = Vector3(-5.2154064e-08, 0.0438212, -3.5980577e-07)
+bones/14/rotation = Quaternion(-0.0015304415, 0.0007451259, -0.0060738767, 0.9999801)
+bones/16/position = Vector3(-0.022598647, 0.09109319, 0.0051802266)
+bones/16/rotation = Quaternion(0.118996195, -0.06831996, -0.098521374, 0.9856297)
+bones/17/rotation = Quaternion(0.100074485, 0.0038365703, -0.01009047, 0.9949214)
+bones/18/rotation = Quaternion(2.2009235e-06, -1.6751927e-07, -6.63283e-05, 1)
+bones/20/position = Vector3(-3.5013238e-07, 0.09533406, -4.6129122e-07)
+bones/20/rotation = Quaternion(0.09366817, -0.012618013, -0.059285063, 0.9937568)
+bones/21/rotation = Quaternion(0.0914431, 9.458006e-05, 0.0026392848, 0.9958068)
+bones/22/rotation = Quaternion(-4.0409936e-06, -1.6275888e-07, 2.0526211e-05, 1)
+bones/24/position = Vector3(0.018650841, 0.09104537, 0.00043012598)
+bones/24/rotation = Quaternion(0.18357746, 0.0056776195, -0.05749539, 0.981306)
+bones/25/rotation = Quaternion(0.10861926, -0.0011286179, 0.0008891063, 0.99408245)
+bones/26/rotation = Quaternion(-4.033557e-06, -2.9809283e-07, -6.354228e-07, 1)
+bones/28/position = Vector3(0.038062684, 0.08077788, 0.0048686285)
+bones/28/rotation = Quaternion(0.29657215, 0.036546223, -0.06284, 0.9522397)
+bones/29/rotation = Quaternion(0.19623853, -0.0009160547, 0.034522716, 0.9799479)
+bones/30/rotation = Quaternion(8.52236e-06, 5.5164134e-07, -6.652471e-05, 1)
+bones/32/rotation = Quaternion(0.540083, -0.52870977, 0.54607904, 0.3613506)
+bones/33/rotation = Quaternion(0.4896742, -0.29088154, -0.20016599, 0.7972081)
+bones/34/position = Vector3(-1.06487505e-07, 0.2784153, -1.4142583e-07)
+bones/34/rotation = Quaternion(0.0006583991, 0.0058655986, -0.11157643, 0.9937384)
+bones/35/position = Vector3(1.7861204e-07, 0.28328848, 9.2723084e-08)
+bones/35/rotation = Quaternion(-0.20172825, 0.25662243, -0.10184912, 0.93972206)
+bones/36/position = Vector3(0.026818587, 0.024648419, 0.015739687)
+bones/36/rotation = Quaternion(0.20387587, 0.15056954, -0.11117494, 0.960939)
+bones/37/position = Vector3(5.2417505e-08, 0.0418898, -3.281673e-08)
+bones/37/rotation = Quaternion(-0.0411605, -0.009343234, 0.1390458, 0.9893861)
+bones/38/position = Vector3(2.7298633e-08, 0.034163304, -2.883624e-09)
+bones/38/rotation = Quaternion(-0.001665541, -0.0008075719, 0.006919497, 0.99997437)
+bones/40/position = Vector3(0.022598358, 0.09108296, 0.0051787095)
+bones/40/rotation = Quaternion(0.159768, 0.06656373, 0.060693968, 0.98303604)
+bones/41/rotation = Quaternion(0.08669247, 0.00029175568, 0.007065683, 0.9962101)
+bones/42/position = Vector3(-1.261096e-07, 0.034151666, -5.7539943e-08)
+bones/42/rotation = Quaternion(1.0574793e-05, -1.8729075e-07, -8.8072324e-05, 1)
+bones/44/position = Vector3(-2.6088168e-07, 0.09532521, 4.8248154e-07)
+bones/44/rotation = Quaternion(0.14271758, 0.008492473, 0.051195797, 0.988402)
+bones/45/rotation = Quaternion(0.11381234, 0.00057149044, -0.004747681, 0.99349076)
+bones/46/rotation = Quaternion(2.0195055e-06, -1.5769648e-07, -0.00032192204, 0.99999994)
+bones/48/position = Vector3(-0.01865137, 0.09103609, 0.0004307319)
+bones/48/rotation = Quaternion(0.18700701, 0.011703423, 0.033031505, 0.98173344)
+bones/49/rotation = Quaternion(0.09176923, 0.002790186, -0.005053108, 0.99576366)
+bones/50/rotation = Quaternion(2.066391e-06, -8.35351e-08, -0.00011254099, 1)
+bones/52/position = Vector3(-0.038062826, 0.08076698, 0.0048671393)
+bones/52/rotation = Quaternion(0.19608203, -0.006727941, 0.03310279, 0.9800055)
+bones/53/rotation = Quaternion(0.11093265, 0.007335794, -0.03588156, 0.9931529)
+bones/54/rotation = Quaternion(5.616749e-06, -2.462882e-07, -0.0004968697, 0.9999999)
+bones/56/rotation = Quaternion(0.023512686, 0.13714215, 0.98730654, -0.076584466)
+bones/57/rotation = Quaternion(-0.16703916, -0.00084182766, -0.0048385332, 0.985938)
+bones/58/rotation = Quaternion(0.42863616, -0.16254856, 0.04252497, 0.88771665)
+bones/59/rotation = Quaternion(0.3338724, -0.021806523, 0.020360518, 0.94214606)
+bones/61/rotation = Quaternion(-0.06087807, 0.031509142, 0.9959374, -0.05839267)
+bones/62/rotation = Quaternion(-0.11060727, -0.00020939813, 0.0021114538, 0.993862)
+bones/63/rotation = Quaternion(0.49429128, 0.081839204, -0.065608144, 0.862945)
+bones/64/rotation = Quaternion(0.35782325, -0.007803631, 0.006070162, 0.93373704)
+
+[node name="RightHandAttachment" type="BoneAttachment3D" parent="ybot_root/Armature/Skeleton3D" index="2" unique_id=187272600]
+transform = Transform3D(0.05101353, -0.37028962, 0.9275147, 0.33103383, -0.8699508, -0.3655154, 0.94223875, 0.3256849, 0.07819903, -0.19433647, 0.8781557, 0.11797308)
+bone_name = "hand.R"
+bone_idx = 35
+
+[node name="Shortsword" parent="ybot_root/Armature/Skeleton3D/RightHandAttachment" unique_id=187272625 instance=ExtResource("3_08rfx")]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1068867929]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.92840576, 0)
+shape = SubResource("CapsuleShape3D_bandit")
+
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="." unique_id=236878344]
+
+[node name="BanditPerception" type="Node" parent="."]
+script = ExtResource("4_percep")
+
+[node name="BanditTorchSearch" type="Node" parent="."]
+script = ExtResource("6_torch")
+
+[node name="BanditPatrol" type="Node" parent="."]
+script = ExtResource("7_patrol")
+
+[node name="BanditDebugVision" type="MeshInstance3D" parent="."]
+script = ExtResource("8_debug")
+enabled = false
+
+[node name="BanditBodyDetector" type="Node" parent="."]
+script = ExtResource("9_body")
+
+[editable path="ybot_root"]

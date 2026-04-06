@@ -31,6 +31,11 @@ bump_strength = 6.0
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_water"]
 render_priority = 0
 shader = ExtResource("1_shader")
+shader_parameter/wave_amplitude = 0.250000011875
+shader_parameter/wave_wavelength = 300.0
+shader_parameter/wave_steepness = 1.0
+shader_parameter/wave_speed = 0.50000002375
+shader_parameter/wind_direction = Vector2(0.8, 0.6)
 shader_parameter/water_tint = Color(0.02, 0.06, 0.1, 1)
 shader_parameter/tint_strength = 0.3
 shader_parameter/roughness = 0.0

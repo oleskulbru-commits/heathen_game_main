@@ -1,0 +1,88 @@
+[gd_scene format=3 uid="uid://boh3dpq3gx06x"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_pole"]
+top_radius = 0.035
+bottom_radius = 0.045
+height = 1.6
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pole"]
+albedo_color = Color(0.25, 0.15, 0.08, 1)
+roughness = 0.85
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_head"]
+top_radius = 0.065
+bottom_radius = 0.05
+height = 0.2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_head"]
+albedo_color = Color(0.12, 0.08, 0.04, 1)
+roughness = 0.9
+
+[sub_resource type="SphereMesh" id="SphereMesh_flame"]
+radius = 0.1
+height = 0.25
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flame"]
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+albedo_color = Color(1, 0.7, 0.2, 0.85)
+billboard_mode = 1
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_particle"]
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+albedo_color = Color(1, 0.5, 0.08, 0.6)
+billboard_mode = 3
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_fire"]
+direction = Vector3(0, 1, 0)
+spread = 12.0
+initial_velocity_min = 0.3
+initial_velocity_max = 0.8
+gravity = Vector3(0, 1.5, 0)
+scale_min = 0.4
+color = Color(1, 0.55, 0.1, 0.7)
+
+[sub_resource type="SphereMesh" id="SphereMesh_particle"]
+radius = 0.025
+height = 0.05
+
+[node name="StandingTorch" type="Node3D" unique_id=310509772]
+groups = ["flame", "torch"]
+
+[node name="Pole" type="MeshInstance3D" parent="." unique_id=554421236]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+mesh = SubResource("CylinderMesh_pole")
+surface_material_override/0 = SubResource("StandardMaterial3D_pole")
+
+[node name="Head" type="MeshInstance3D" parent="." unique_id=225615414]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
+mesh = SubResource("CylinderMesh_head")
+surface_material_override/0 = SubResource("StandardMaterial3D_head")
+
+[node name="Flame" type="MeshInstance3D" parent="." unique_id=212882363]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.9, 0)
+mesh = SubResource("SphereMesh_flame")
+surface_material_override/0 = SubResource("StandardMaterial3D_flame")
+
+[node name="FireLight" type="OmniLight3D" parent="." unique_id=265774212]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.85, 0)
+light_color = Color(1, 0.65, 0.3, 1)
+light_energy = 2.5
+light_indirect_energy = 0.5
+shadow_enabled = true
+omni_range = 12.0
+omni_attenuation = 1.5
+
+[node name="FireParticles" type="GPUParticles3D" parent="." unique_id=1353022035]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.85, 0)
+material_override = SubResource("StandardMaterial3D_particle")
+amount = 20
+lifetime = 0.6
+process_material = SubResource("ParticleProcessMaterial_fire")
+draw_pass_1 = SubResource("SphereMesh_particle")
