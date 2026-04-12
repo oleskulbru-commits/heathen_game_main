@@ -49,7 +49,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_use_ability(selected_ability)
 
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if _q_pressed_time < 0.0 or _menu_is_open:
 		return
 	var held := Time.get_ticks_msec() / 1000.0 - _q_pressed_time
@@ -91,7 +91,11 @@ func _use_ability(index: int) -> void:
 
 func _drukna() -> void:
 	var pos := _player.global_position
-	for torch in get_tree().get_nodes_in_group("flame"):
+	var torches: Array[Node] = []
+	torches.append_array(get_tree().get_nodes_in_group("torch"))
+	if torches.is_empty():
+		torches.append_array(get_tree().get_nodes_in_group("flame"))
+	for torch in torches:
 		if not is_instance_valid(torch):
 			continue
 		if torch.global_position.distance_to(pos) > DRUKNA_RANGE:

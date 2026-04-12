@@ -14,6 +14,8 @@ extends Node
 @export var wander_interval: float = 4.0
 
 const BanditShared := preload("res://scripts/enemies/bandit_shared.gd")
+const LightSampler := preload("res://scripts/common/light_sampler.gd")
+const StealthGridScript := preload("res://scripts/enemies/stealth_nav_grid.gd")
 
 # ── Animation names inside the Searching library ────────────────────────────
 const ANIM_GRAB := "unarmed_grab_torch_from_wall"
@@ -27,15 +29,10 @@ const ANIM_TORCH_INSPECT: Array[String] = [
 	"standing_torch_inspect_downward",
 	"standing_torch_inspect_forward",
 ]
-const ANIM_LOOK_AROUND: Array[String] = [
-	"look_around_02",
-	"look_around_03",
-	"look_around_04",
-	"looking_around",
-]
 
 # frame 33 of 77 at 30 fps
 const GRAB_TORCH_APPEAR_TIME := 33.0 / 30.0
+const DEFAULT_BANDIT_MOVE_SPEED := 3.5
 
 enum State {
 	INACTIVE,
@@ -50,7 +47,7 @@ enum State {
 
 var _state: State = State.INACTIVE
 var _bandit: CharacterBody3D
-var _perception: Node
+var _brain: Node
 var _anim_player: AnimationPlayer
 var _anim_tree: AnimationTree
 var _skeleton: Skeleton3D
@@ -65,10 +62,9 @@ var _normal_speed: float
 var _torch_appeared: bool = false
 var _waiting_anim: bool = false
 var _at_wander_point: bool = false
-var _patrol: Node
 
 # ── Stealth-aware routing ────────────────────────────────────────────────────
-var _stealth_grid: StealthNavGrid
+var _stealth_grid = null
 var _stealth_waypoints: PackedVector3Array = PackedVector3Array()
 var _stealth_wp_index: int = 0
 const _STEALTH_WP_ARRIVE := 2.5
@@ -78,32 +74,25 @@ func _ready() -> void:
 	_bandit = get_parent() as CharacterBody3D
 	if not _bandit:
 		return
-	_perception = _bandit.get_node_or_null("BanditPerception")
-	var visual_root: Node3D = _bandit.get_node_or_null("ybot_root")
-	if visual_root:
-		_anim_player = visual_root.get_node_or_null("AnimationPlayer") as AnimationPlayer
-		_anim_tree = visual_root.get_node_or_null("AnimationTree") as AnimationTree
-		_skeleton = visual_root.get_node_or_null("Armature/Skeleton3D") as Skeleton3D
+	_brain = _bandit.get_node_or_null("BanditBrain")
+	var nodes := BanditShared.resolve_visual_nodes(_bandit)
+	_anim_player = nodes["anim_player"]
+	_anim_tree = nodes["anim_tree"]
+	_skeleton = nodes["skeleton"]
 
 	_home_position = _bandit.global_position
-	_normal_speed = _bandit.move_speed
+	_normal_speed = _get_bandit_move_speed()
 
-	# Load searching animation library
-	if _anim_player:
-		var lib := load(BanditShared.LIB_PATH) as AnimationLibrary
-		if lib and not _anim_player.has_animation_library(BanditShared.LIB_NAME):
-			_anim_player.add_animation_library(BanditShared.LIB_NAME, lib)
+	BanditShared.load_searching_library(_anim_player)
 
-	_patrol = _bandit.get_node_or_null("BanditPatrol")
-
-	if _perception:
-		_perception.player_lost_in_darkness.connect(_on_player_lost)
+	if _brain:
+		_brain.player_lost_in_darkness.connect(_on_player_lost)
 
 
 func _physics_process(delta: float) -> void:
 	if _state == State.INACTIVE:
 		return
-	if _perception and _perception.alert_level >= 2:
+	if _brain and _brain.has_method("has_visual_contact") and _brain.has_visual_contact():
 		_abort()
 		return
 	match _state:
@@ -129,15 +118,12 @@ func _on_player_lost(last_known_pos: Vector3) -> void:
 	if _state != State.INACTIVE:
 		return
 	_search_center = last_known_pos
-	if _patrol and _patrol.has_torch():
-		_change_state(State.WALKING_TO_LKP)
-		return
 	var torch := _find_nearest_torch()
 	if torch:
 		_torch_source = torch
 		_change_state(State.WALKING_TO_TORCH)
 	else:
-		_change_state(State.SEARCHING)
+		_change_state(State.WALKING_TO_LKP)
 
 
 # ── State processors ────────────────────────────────────────────────────────
@@ -175,7 +161,7 @@ func _process_walking_to_lkp() -> void:
 
 	# Build stealth path on first call or if waypoints exhausted
 	if _stealth_waypoints.is_empty():
-		_stealth_grid = StealthNavGrid.new()
+		_stealth_grid = StealthGridScript.new()
 		var mid := (_bandit.global_position + _search_center) * 0.5
 		_stealth_grid.build(mid, _bandit.get_world_3d(), _bandit.get_tree())
 		if _stealth_grid.is_valid():
@@ -216,7 +202,8 @@ func _process_searching(delta: float) -> void:
 		return
 
 	# Sub-state: walking to wander point, wait until nav finished
-	if _bandit.nav_agent.is_navigation_finished():
+	var nav_agent := _bandit.get_node_or_null("NavigationAgent3D") as NavigationAgent3D
+	if nav_agent and nav_agent.is_navigation_finished():
 		_wander_timer += delta
 		if _wander_timer >= wander_interval:
 			_wander_timer = 0.0
@@ -264,25 +251,30 @@ func _change_state(new_state: State) -> void:
 	_state = new_state
 	match new_state:
 		State.WALKING_TO_TORCH:
-			_bandit.move_speed = _normal_speed
+			_set_bandit_move_speed(_normal_speed)
 			_reactivate_tree()
 		State.GRABBING_TORCH:
 			_stop_movement()
 			_face_torch()
 			_play_grab_anim()
 		State.WALKING_TO_LKP:
-			_bandit.move_speed = search_walk_speed
+			_set_bandit_move_speed(search_walk_speed)
 			_reactivate_tree()
 		State.SEARCHING:
 			_search_timer = 0.0
 			_wander_timer = 0.0
-			_at_wander_point = true
-			_bandit.move_speed = search_walk_speed
-			if _anim_tree:
-				_anim_tree.active = false
-			_play_random_search_anim()
+			_set_bandit_move_speed(search_walk_speed)
+			if _torch_instance:
+				_at_wander_point = true
+				if _anim_tree:
+					_anim_tree.active = false
+				_play_random_search_anim()
+			else:
+				_at_wander_point = false
+				_reactivate_tree()
+				_pick_wander_target()
 		State.RETURNING_TORCH:
-			_bandit.move_speed = _normal_speed
+			_set_bandit_move_speed(_normal_speed)
 			_reactivate_tree()
 		State.PLACING_TORCH:
 			_stop_movement()
@@ -290,10 +282,10 @@ func _change_state(new_state: State) -> void:
 			_torch_appeared = false
 			_play_grab_anim()
 		State.RETURNING_HOME:
-			_bandit.move_speed = _normal_speed
+			_set_bandit_move_speed(_normal_speed)
 			_reactivate_tree()
 		State.INACTIVE:
-			_bandit.move_speed = _normal_speed
+			_set_bandit_move_speed(_normal_speed)
 			_reactivate_tree()
 
 
@@ -303,7 +295,7 @@ func _abort() -> void:
 		_show_world_torch()
 	_at_wander_point = false
 	_state = State.INACTIVE
-	_bandit.move_speed = _normal_speed
+	_set_bandit_move_speed(_normal_speed)
 	_stealth_waypoints = PackedVector3Array()
 	_stealth_wp_index = 0
 	_stealth_grid = null
@@ -312,7 +304,31 @@ func _abort() -> void:
 
 func _stop_movement() -> void:
 	_bandit.velocity = Vector3.ZERO
-	_bandit.nav_agent.target_position = _bandit.global_position
+	var nav_agent := _bandit.get_node_or_null("NavigationAgent3D") as NavigationAgent3D
+	if nav_agent:
+		nav_agent.target_position = _bandit.global_position
+
+
+func _get_bandit_move_speed() -> float:
+	if _bandit.has_method("get_desired_move_speed"):
+		var desired_speed_value: Variant = _bandit.call("get_desired_move_speed")
+		if desired_speed_value is float:
+			return desired_speed_value
+		if desired_speed_value is int:
+			return float(desired_speed_value)
+	var speed_value: Variant = _bandit.get("move_speed")
+	if speed_value is float:
+		return speed_value
+	if speed_value is int:
+		return float(speed_value)
+	return DEFAULT_BANDIT_MOVE_SPEED
+
+
+func _set_bandit_move_speed(value: float) -> void:
+	if _bandit.has_method("set_desired_move_speed"):
+		_bandit.call("set_desired_move_speed", value)
+	elif _bandit.get("move_speed") != null:
+		_bandit.set("move_speed", value)
 
 
 # ── Torch finding ────────────────────────────────────────────────────────────
@@ -321,10 +337,7 @@ func _find_nearest_torch() -> Node3D:
 	var best: Node3D = null
 	var best_dist := torch_search_radius
 	# Check both groups — "torch" is canonical, "flame" is the legacy fallback
-	var candidates: Array[Node] = []
-	candidates.append_array(get_tree().get_nodes_in_group("torch"))
-	if candidates.is_empty():
-		candidates.append_array(get_tree().get_nodes_in_group("flame"))
+	var candidates: Array[Node] = BanditShared.get_all_torches(get_tree())
 	for node in candidates:
 		if node is Node3D:
 			var d := _bandit.global_position.distance_to(node.global_position)
@@ -401,13 +414,13 @@ func _play_grab_anim() -> void:
 func _play_random_search_anim() -> void:
 	if not _anim_player:
 		return
-	var holding_torch: bool = _torch_instance != null or (_patrol != null and _patrol.has_torch())
+	var holding_torch: bool = _torch_instance != null
 	var choices: Array[String] = []
 	if holding_torch:
 		choices.append_array(ANIM_TORCH_SEARCH)
 		choices.append_array(ANIM_TORCH_INSPECT)
 	else:
-		choices.append_array(ANIM_LOOK_AROUND)
+		choices.append_array(BanditShared.LOOK_AROUND_ANIMS)
 	var pick: String = choices[randi() % choices.size()]
 	var anim_name := StringName(str(BanditShared.LIB_NAME) + "/" + pick)
 	if _anim_player.has_animation(anim_name):
@@ -419,8 +432,7 @@ func _pick_wander_target() -> void:
 	var best_pos := Vector3.ZERO
 	var best_light := INF
 	var space := _bandit.get_world_3d().direct_space_state
-	var grid := StealthNavGrid.new()
-	var lights := grid._find_omni_lights(_bandit.get_tree().root)
+	var lights := LightSampler.find_omni_lights(_bandit.get_tree().root)
 
 	for i in 5:
 		var angle := randf() * TAU
@@ -429,7 +441,7 @@ func _pick_wander_target() -> void:
 		var total_light := 0.0
 		for light in lights:
 			if is_instance_valid(light):
-				total_light += grid._sample_omni(light, candidate, space)
+				total_light += LightSampler.sample_omni(light, candidate, space)
 		if total_light < best_light:
 			best_light = total_light
 			best_pos = candidate
@@ -443,8 +455,7 @@ func _pick_wander_target() -> void:
 
 
 func _reactivate_tree() -> void:
-	if _anim_tree and not _anim_tree.active:
-		_anim_tree.active = true
+	BanditShared.reactivate_tree(_anim_tree)
 
 
 func _face_torch() -> void:

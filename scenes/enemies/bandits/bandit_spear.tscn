@@ -3,11 +3,13 @@
 [ext_resource type="Script" uid="uid://cqypn0kkngjl7" path="res://scripts/enemies/bandit_controller.gd" id="1_kq4t5"]
 [ext_resource type="PackedScene" uid="uid://brxwvwmv1ip30" path="res://scenes/xbots/ybot_root.tscn" id="2_r44o2"]
 [ext_resource type="PackedScene" path="res://scenes/items/shortsword.tscn" id="3_tc3k3"]
+[ext_resource type="Script" path="res://scripts/enemies/bandit_brain.gd" id="4_brain"]
 [ext_resource type="Script" path="res://scripts/enemies/bandit_perception.gd" id="4_percep"]
 [ext_resource type="Script" path="res://scripts/enemies/bandit_torch_search.gd" id="6_torch"]
 [ext_resource type="Script" path="res://scripts/enemies/bandit_patrol.gd" id="7_patrol"]
 [ext_resource type="Script" path="res://scripts/enemies/bandit_debug_vision.gd" id="8_debug"]
 [ext_resource type="Script" path="res://scripts/enemies/bandit_body_detector.gd" id="9_body"]
+[ext_resource type="Script" path="res://scripts/enemies/bandit_combat.gd" id="10_combat"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_bandit"]
 radius = 0.30078125
@@ -109,6 +111,9 @@ shape = SubResource("CapsuleShape3D_bandit")
 
 [node name="NavigationAgent3D" type="NavigationAgent3D" parent="." unique_id=236878344]
 
+[node name="BanditBrain" type="Node" parent="."]
+script = ExtResource("4_brain")
+
 [node name="BanditPerception" type="Node" parent="."]
 script = ExtResource("4_percep")
 
@@ -124,5 +129,8 @@ enabled = false
 
 [node name="BanditBodyDetector" type="Node" parent="."]
 script = ExtResource("9_body")
+
+[node name="BanditCombat" type="Node" parent="."]
+script = ExtResource("10_combat")
 
 [editable path="ybot_root"]

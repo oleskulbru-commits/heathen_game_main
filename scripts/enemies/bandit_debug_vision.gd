@@ -4,10 +4,13 @@ extends MeshInstance3D
 ## Color shifts from green → yellow → orange → red with suspicion.
 ## Toggle with the exported `enabled` flag or remove the node in production.
 
+const BanditShared := preload("res://scripts/enemies/bandit_shared.gd")
+
 @export var segments: int = 24
 @export var enabled: bool = true
 
 var _perception: Node
+var _brain: Node
 var _visual_root: Node3D
 var _imm: ImmediateMesh
 var _mat: StandardMaterial3D
@@ -16,6 +19,7 @@ var _mat: StandardMaterial3D
 func _ready() -> void:
 	var bandit := get_parent()
 	_perception = bandit.get_node_or_null("BanditPerception")
+	_brain = bandit.get_node_or_null("BanditBrain")
 	_visual_root = bandit.get_node_or_null("ybot_root") as Node3D
 
 	_imm = ImmediateMesh.new()
@@ -31,7 +35,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if not enabled or not _perception:
+	if not enabled or not _perception or not _brain:
 		_imm.clear_surfaces()
 		return
 	_draw_cone()
@@ -45,21 +49,11 @@ func _draw_cone() -> void:
 	var half_fov := deg_to_rad(_perception.sight_fov_deg * 0.5)
 
 	# Pick color from suspicion
-	var s: float = _perception.suspicion
-	var tc: float = _perception.threshold_curious
-	var ta: float = _perception.threshold_alert
-	var tb: float = _perception.threshold_combat
-	var color: Color
-	if s <= 0.0:
-		color = Color(0.2, 0.8, 0.2, 0.12)
-	elif s < tc:
-		color = Color(0.2, 0.8, 0.2, 0.12).lerp(Color(1.0, 0.9, 0.3, 0.18), s / tc)
-	elif s < ta:
-		color = Color(1.0, 0.9, 0.3, 0.18).lerp(Color(1.0, 0.5, 0.0, 0.22), (s - tc) / (ta - tc))
-	elif s < tb:
-		color = Color(1.0, 0.5, 0.0, 0.22).lerp(Color(1.0, 0.1, 0.1, 0.28), (s - ta) / (tb - ta))
-	else:
-		color = Color(1.0, 0.1, 0.1, 0.28)
+	var s: float = _brain.suspicion
+	var tc: float = _brain.threshold_curious
+	var ta: float = _brain.threshold_alert
+	var tb: float = _brain.threshold_combat
+	var color := BanditShared.suspicion_color(s, tc, ta, tb)
 
 	# Determine the model's visual forward direction.
 	# The ybot model faces +Z in its rest pose, so transform that axis through

@@ -48,15 +48,17 @@ func _gather_suspicion() -> void:
 	if _dbg_frame % 120 == 1:
 		print("[DetectionMeter] _gather: bandit_count=", bandits.size())
 	for node in bandits:
-		var perception := node.get_node_or_null("BanditPerception")
-		if not perception:
+		var source := node.get_node_or_null("BanditBrain")
+		if not source:
+			source = node.get_node_or_null("BanditPerception")
+		if not source:
 			if _dbg_frame % 120 == 1:
-				print("[DetectionMeter]   bandit '", node.name, "' has no BanditPerception child")
+				print("[DetectionMeter]   bandit '", node.name, "' has no BanditBrain/BanditPerception child")
 			continue
-		var sus: float = perception.suspicion
+		var sus: float = source.suspicion
 		if sus > _peak_suspicion:
 			_peak_suspicion = sus
-			_alert_level = perception.alert_level
+			_alert_level = source.alert_level
 
 func _draw() -> void:
 	# Use viewport rect — Control.size is 0 when direct child of CanvasLayer

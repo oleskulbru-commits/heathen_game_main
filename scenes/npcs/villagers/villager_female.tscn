@@ -1,0 +1,22 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/game/villager_controller.gd" id="1_ctrl"]
+[ext_resource type="PackedScene" path="res://scenes/xbots/xbot_npc.tscn" id="2_body"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_villager"]
+radius = 0.30078125
+height = 1.8602295
+
+[node name="VillagerFemale" type="CharacterBody3D"]
+script = ExtResource("1_ctrl")
+groups = ["villager"]
+visual_root_path = NodePath("xbot_npc")
+anim_tree_path = NodePath("xbot_npc/AnimationTree")
+anim_player_path = NodePath("xbot_npc/AnimationPlayer")
+
+[node name="xbot_npc" parent="." instance=ExtResource("2_body")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.92840576, 0)
+shape = SubResource("CapsuleShape3D_villager")

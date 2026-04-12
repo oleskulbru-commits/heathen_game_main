@@ -36,6 +36,8 @@
 [ext_resource type="PackedScene" uid="uid://43snob725tfs" path="res://scenes/ui/hud.tscn" id="19_hud"]
 [ext_resource type="Script" uid="uid://brh8x1wnycrl5" path="res://demo/src/RuntimeNavigationBaker.gd" id="20_navbaker"]
 [ext_resource type="PackedScene" uid="uid://dfpatff4d5okj" path="res://addons/godot_3d_cursor/scenes/3d_cursor.tscn" id="34_j8jky"]
+[ext_resource type="PackedScene" path="res://scenes/npcs/villagers/villager_male.tscn" id="37_pibwh"]
+[ext_resource type="PackedScene" path="res://scenes/npcs/villagers/villager_female.tscn" id="38_c6pm6"]
 
 [sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_env01"]
 rayleigh_color = Color(0.26, 0.41, 0.58, 1)
@@ -53,7 +55,7 @@ background_energy_multiplier = 4.09
 sky = SubResource("Sky_env01")
 ambient_light_source = 3
 reflected_light_source = 2
-tonemap_mode = 3
+tonemap_mode = 4
 ssr_enabled = true
 ssao_enabled = true
 ssao_power = 1.2
@@ -69,6 +71,7 @@ sdfgi_use_occlusion = true
 sdfgi_bounce_feedback = 0.9
 sdfgi_cascades = 6
 sdfgi_energy = 1.6
+glow_enabled = true
 glow_normalized = true
 glow_intensity = 0.45
 glow_strength = 0.85
@@ -91,8 +94,9 @@ volumetric_fog_gi_inject = 0.8
 volumetric_fog_anisotropy = 0.6
 volumetric_fog_length = 250.0
 volumetric_fog_sky_affect = 0.0
-adjustment_contrast = 1.06
-adjustment_saturation = 1.05
+adjustment_enabled = true
+adjustment_contrast = 1.04
+adjustment_saturation = 1.2
 
 [sub_resource type="CameraAttributesPractical" id="CameraAttributes_env01"]
 auto_exposure_enabled = true
@@ -257,6 +261,10 @@ import_scale = 0.4
 metadata/_edit_lock_ = true
 
 [node name="Ocean" parent="World" unique_id=990331587 instance=ExtResource("8_ocean")]
+visible = false
+
+[node name="WaterMesh" parent="World/Ocean" index="0" unique_id=1120050994]
+visible = false
 
 [node name="PathSegment" parent="World" unique_id=14686769 instance=ExtResource("6_jbj1t")]
 transform = Transform3D(0.2043423, 0, 0.9788995, -0.10327433, 0.9944193, 0.021558205, -0.97343653, -0.105500445, 0.20320193, 6667.887, 2.509265, 9010.519)
@@ -331,7 +339,7 @@ transform = Transform3D(0.94489753, 0, 0.3273663, 0, 1, 0, -0.3273663, 0, 0.9448
 [node name="Characters" type="Node3D" parent="." unique_id=592048963]
 
 [node name="Player" parent="Characters" unique_id=731287834 instance=ExtResource("2_0wfyh")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6650.0903, 3.1358743, 9044.724)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6634.79, 2.851027, 9039.433)
 
 [node name="RuntimeNavigationBaker" type="Node" parent="." unique_id=589365160 node_paths=PackedStringArray("terrain", "player")]
 script = ExtResource("20_navbaker")
@@ -347,5 +355,11 @@ metadata/show_title_label = true
 metadata/show_number_label = true
 metadata/scale_affect_labels = true
 metadata/_edit_lock_ = true
+
+[node name="VillagerMale" parent="." unique_id=348096769 instance=ExtResource("37_pibwh")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6657.0366, 2.5973878, 9020.463)
+
+[node name="VillagerFemale" parent="." unique_id=1273189951 instance=ExtResource("38_c6pm6")]
+transform = Transform3D(-0.96649265, 0, 0.2566943, 0, 1, 0, -0.2566943, 0, -0.96649265, 6659.17, 2.6341982, 9014.993)
 
 [editable path="World/Ocean"]

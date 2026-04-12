@@ -1,12 +1,13 @@
-class_name StealthNavGrid
 extends RefCounted
 ## Builds a light-aware AStar3D graph on the XZ plane so bandits can prefer
 ## dark / shadowed routes when searching for the player.
 ##
 ## Usage:
-##   var grid := StealthNavGrid.new()
+##   var grid := preload("res://scripts/enemies/stealth_nav_grid.gd").new()
 ##   grid.build(search_center, bandit.get_world_3d(), bandit.get_tree())
 ##   var path := grid.get_stealth_path(bandit.global_position, target_pos)
+
+const LightSampler := preload("res://scripts/common/light_sampler.gd")
 
 # ── Configuration ────────────────────────────────────────────────────────────
 var cell_size: float = 2.0
@@ -33,7 +34,7 @@ func build(center: Vector3, world: World3D, scene_tree: SceneTree) -> void:
 
 	var map: RID = world.navigation_map
 
-	var lights := _find_omni_lights(scene_tree.root)
+	var lights := LightSampler.find_omni_lights(scene_tree.root)
 
 	# Grid dimensions
 	var half := grid_radius
@@ -72,7 +73,7 @@ func build(center: Vector3, world: World3D, scene_tree: SceneTree) -> void:
 			var total_light := 0.0
 			for light in lights:
 				if is_instance_valid(light):
-					total_light += _sample_omni(light, nav_pos, space)
+					total_light += LightSampler.sample_omni(light, nav_pos, space)
 
 			var weight := 1.0 + total_light * light_penalty
 			var point_id := zi * _grid_width + xi
@@ -117,35 +118,4 @@ func is_valid() -> bool:
 	return _built
 
 
-# ── Light sampling (duplicated from light_probe.gd to avoid coupling) ────────
 
-func _sample_omni(light: OmniLight3D, sample_pos: Vector3, space: PhysicsDirectSpaceState3D) -> float:
-	if not light.visible:
-		return 0.0
-	var light_pos := light.global_position
-	var dist := sample_pos.distance_to(light_pos)
-	var range_val: float = light.omni_range
-	if dist >= range_val:
-		return 0.0
-
-	var atten_exp: float = light.omni_attenuation
-	var falloff := 1.0 - pow(dist / range_val, atten_exp)
-	falloff = maxf(falloff, 0.0)
-
-	var query := PhysicsRayQueryParameters3D.create(sample_pos, light_pos)
-	query.collision_mask = 1
-	query.hit_from_inside = false
-	var result := space.intersect_ray(query)
-	if result and result.position.distance_to(light_pos) > 0.3:
-		return 0.0
-
-	return falloff * light.light_energy * 0.15
-
-
-func _find_omni_lights(node: Node) -> Array[OmniLight3D]:
-	var lights: Array[OmniLight3D] = []
-	if node is OmniLight3D:
-		lights.append(node)
-	for child in node.get_children():
-		lights.append_array(_find_omni_lights(child))
-	return lights

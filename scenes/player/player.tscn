@@ -2,8 +2,11 @@
 
 [ext_resource type="Script" uid="uid://bqcrejaas6xtu" path="res://scripts/player/player_controller.gd" id="1_player_script"]
 [ext_resource type="PackedScene" uid="uid://bp3a0degmc061" path="res://scenes/xbots/xbot_root.tscn" id="2_dovo2"]
-[ext_resource type="Script" path="res://scripts/player/light_probe.gd" id="3_light_probe"]
-[ext_resource type="Script" path="res://scripts/player/ability_system.gd" id="4_ability"]
+[ext_resource type="Script" uid="uid://duxkiamkw1va7" path="res://scripts/player/light_probe.gd" id="3_light_probe"]
+[ext_resource type="Script" uid="uid://13us8jy7uehq" path="res://scripts/player/ability_system.gd" id="4_ability"]
+[ext_resource type="Script" uid="uid://b2anh35tj8r2y" path="res://scripts/player/foot_ik.gd" id="5_foot_ik"]
+[ext_resource type="Script" uid="uid://c1rg5bns50e0g" path="res://scripts/player/player_combat.gd" id="6_combat"]
+[ext_resource type="PackedScene" path="res://scenes/items/seax.tscn" id="7_seax"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_dovo2"]
 radius = 0.30078125
@@ -15,24 +18,79 @@ script = ExtResource("1_player_script")
 [node name="xbot_root" parent="." unique_id=1806457301 instance=ExtResource("2_dovo2")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
 
+[node name="Skeleton3D" parent="xbot_root/Armature" parent_id_path=PackedInt32Array(1806457301, 712229800) index="0" unique_id=1326590042]
+bones/0/position = Vector3(0, 0, 0)
+bones/1/rotation = Quaternion(0.0037562163, -0.041468725, -0.024067521, 0.9988429)
+bones/2/rotation = Quaternion(-0.07098823, 0.0048846956, 0.014860698, 0.9973545)
+bones/3/rotation = Quaternion(0.018047756, 0.007935069, 0.026739141, 0.99944806)
+bones/4/rotation = Quaternion(0.03092486, 0.008278942, 0.026634643, 0.99913245)
+bones/5/rotation = Quaternion(-0.09393029, 0.0022067425, -0.0014708199, 0.99557525)
+bones/6/rotation = Quaternion(0.028389517, 0.011122671, -0.03885271, 0.99877965)
+bones/8/rotation = Quaternion(-0.5441655, 0.52614534, -0.540424, -0.3674192)
+bones/9/rotation = Quaternion(0.48721197, -0.30365115, -0.16994894, 0.80096066)
+bones/10/rotation = Quaternion(-7.462502e-05, -0.00043687728, -0.1682408, 0.98574585)
+bones/11/rotation = Quaternion(-0.20878042, 0.24369256, -0.075728334, 0.94408154)
+bones/16/rotation = Quaternion(0.096802786, 0.056021977, 0.065470636, 0.9915667)
+bones/17/rotation = Quaternion(0.023165837, -0.0070651122, 0.007947789, 0.9996751)
+bones/20/rotation = Quaternion(0.11159865, 0.006588131, 0.0535525, 0.9922875)
+bones/21/rotation = Quaternion(0.08279148, 0.000484493, -0.0026758458, 0.99656326)
+bones/24/rotation = Quaternion(0.16929959, 0.010882418, 0.03435705, 0.9849055)
+bones/25/rotation = Quaternion(0.07383062, 0.0027746577, -0.0038383063, 0.9972596)
+bones/28/rotation = Quaternion(0.18759336, -0.008755127, 0.039780308, 0.981402)
+bones/29/rotation = Quaternion(0.10106936, 0.0075729545, -0.034735348, 0.994244)
+bones/32/rotation = Quaternion(0.5689676, 0.5034586, -0.5392442, 0.3633472)
+bones/33/rotation = Quaternion(0.4982143, 0.23292816, 0.17833818, 0.81591827)
+bones/34/rotation = Quaternion(6.745322e-05, -0.00039569463, 0.16670115, 0.9860074)
+bones/35/rotation = Quaternion(-0.108202286, -0.14940366, 0.10704427, 0.9769915)
+bones/40/rotation = Quaternion(0.11796435, -0.06828353, -0.09852547, 0.9857558)
+bones/41/rotation = Quaternion(0.09198408, 0.0038625197, -0.009510384, 0.9957076)
+bones/44/rotation = Quaternion(0.09122664, -0.012460157, -0.059447568, 0.9939761)
+bones/45/rotation = Quaternion(0.0830641, 0.00011399688, 0.0021916355, 0.9965418)
+bones/48/rotation = Quaternion(0.16555992, 0.0070742457, -0.05916532, 0.984398)
+bones/49/rotation = Quaternion(0.090393364, -0.0009458313, -0.00095523614, 0.99590534)
+bones/52/rotation = Quaternion(0.23829274, 0.04219602, -0.071417905, 0.96764445)
+bones/53/rotation = Quaternion(0.13703409, -0.00082118175, 0.0235797, 0.9902854)
+bones/56/rotation = Quaternion(-0.060503516, 0.033358175, 0.99589825, -0.058423765)
+bones/57/rotation = Quaternion(-0.10965662, -0.00020086324, 0.002048438, 0.9939675)
+bones/58/rotation = Quaternion(0.49528855, 0.087385304, -0.0733393, 0.8612052)
+bones/61/rotation = Quaternion(0.023334267, 0.13648479, 0.9875345, -0.074853405)
+bones/62/rotation = Quaternion(-0.1579868, -0.0008337354, -0.004481875, 0.9874307)
+bones/63/rotation = Quaternion(0.42637062, -0.15796341, 0.036954902, 0.88988215)
+bones/64/rotation = Quaternion(0.33612576, -0.026647689, 0.023285117, 0.94115216)
+
+[node name="RightHandAttachment" type="BoneAttachment3D" parent="xbot_root/Armature/Skeleton3D" index="2" unique_id=304607991]
+transform = Transform3D(0.1171554, -0.34411415, 0.93158984, 0.32277516, -0.87392896, -0.36340693, 0.93919677, 0.343269, 0.008686304, -0.27267256, 0.85411507, -0.095193066)
+bone_name = "hand.R"
+bone_idx = 11
+
+[node name="Seax" parent="xbot_root/Armature/Skeleton3D/RightHandAttachment" unique_id=1623526072 instance=ExtResource("7_seax")]
+transform = Transform3D(-0.05544439, 0.9891953, 0.13533597, -0.7577377, 0.046604037, -0.6508891, -0.6501693, -0.13883269, 0.74700975, 0.0076766014, 0.0876638, 0.035646856)
+
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=414585826]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.92840576, 0)
 shape = SubResource("CapsuleShape3D_dovo2")
 
 [node name="CameraPivot" type="Node3D" parent="." unique_id=1996218533]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.285, 0)
 
 [node name="SpringArm3D" type="SpringArm3D" parent="CameraPivot" unique_id=1681884768]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.431, 0, 0)
-spring_length = 3.0
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 0)
+spring_length = 2.5
 
 [node name="Camera3D" type="Camera3D" parent="CameraPivot/SpringArm3D" unique_id=430804954]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
 current = true
 fov = 54.0
 
-[node name="LightProbe" type="Node" parent="."]
+[node name="LightProbe" type="Node" parent="." unique_id=1640830727]
 script = ExtResource("3_light_probe")
 
-[node name="AbilitySystem" type="Node" parent="."]
+[node name="AbilitySystem" type="Node" parent="." unique_id=1316350258]
 script = ExtResource("4_ability")
+
+[node name="FootIK" type="Node" parent="." unique_id=399006416]
+script = ExtResource("5_foot_ik")
+
+[node name="PlayerCombat" type="Node" parent="." unique_id=1393002031]
+script = ExtResource("6_combat")
+
+[editable path="xbot_root"]

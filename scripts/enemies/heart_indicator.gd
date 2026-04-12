@@ -15,14 +15,20 @@ var _dbg_frame: int = 0
 func _ready() -> void:
 	visible = false
 	_mat = material_override as ShaderMaterial
-	print("[HeartInd] _ready  mat_ok=", _mat != null, "  parent=", get_parent().name if get_parent() else "null")
+	var parent_name := "null"
+	if get_parent():
+		parent_name = get_parent().name
+	print("[HeartInd] _ready  mat_ok=", _mat != null, "  parent=", parent_name)
 
 ## Called by bandit_controller after add_child so we know which bone to track.
 func setup_bone(skel: Skeleton3D, bone_idx: int) -> void:
 	_skel = skel
 	_bone_idx = bone_idx
+	var bone_name := "INVALID"
+	if bone_idx >= 0:
+		bone_name = skel.get_bone_name(bone_idx)
 	print("[HeartInd] setup_bone: bone_idx=", bone_idx,
-		"  name=", skel.get_bone_name(bone_idx) if bone_idx >= 0 else "INVALID")
+		"  name=", bone_name)
 
 func _process(_delta: float) -> void:
 	_dbg_frame += 1

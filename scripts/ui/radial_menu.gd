@@ -2,8 +2,6 @@ extends Control
 ## Radial ability menu — shows 3 wedges arranged in a circle.
 ## Hold Q opens, mouse selects wedge, release Q confirms selection.
 
-signal ability_selected(index: int)
-
 const ABILITY_NAMES := ["Drukna", "Hrafn", "Gellir"]
 const ABILITY_DESCS := ["Extinguish flames", "Teleport dash", "Freeze enemies"]
 const WEDGE_RADIUS := 120.0

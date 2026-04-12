@@ -10,6 +10,9 @@ extends Node2D
 @export var arc_angle_max_deg: float = 50.0   ## at threshold_combat
 @export var arc_segments: int = 32
 
+const BanditShared := preload("res://scripts/enemies/bandit_shared.gd")
+const PlayerFinder := preload("res://scripts/common/player_finder.gd")
+
 const COLOR_ZERO    := Color(1.0, 0.9, 0.3, 0.0)   # fully transparent
 const COLOR_CURIOUS := Color(1.0, 0.9, 0.3, 0.85)   # yellow
 const COLOR_ALERT   := Color(1.0, 0.5, 0.0, 0.92)   # orange
@@ -22,7 +25,7 @@ var _any_active: bool = false
 
 func _ready() -> void:
 	await get_tree().process_frame
-	_player = _find_player()
+	_player = PlayerFinder.find(get_tree())
 
 
 func _process(_delta: float) -> void:
@@ -46,18 +49,19 @@ func _draw() -> void:
 	_any_active = false
 
 	for node in get_tree().get_nodes_in_group("bandit"):
-		var perception := node.get_node_or_null("BanditPerception")
-		if not perception:
+		var source := node.get_node_or_null("BanditBrain")
+		if not source:
+			source = node.get_node_or_null("BanditPerception")
+		if not source:
 			continue
-		var sus: float = perception.suspicion
+		var sus: float = source.suspicion
 		if sus <= 0.0:
 			continue
 
 		_any_active = true
-
-		var tc: float = perception.threshold_curious
-		var ta: float = perception.threshold_alert
-		var tb: float = perception.threshold_combat
+		var tc: float = source.threshold_curious
+		var ta: float = source.threshold_alert
+		var tb: float = source.threshold_combat
 
 		# ── Colour ──────────────────────────────────────────────────────
 		var color: Color
@@ -88,7 +92,8 @@ func _draw() -> void:
 
 		# draw_arc angles: 0 = right (+X on screen).
 		# Our angle: 0 = up (camera forward).  Screen convention: up = -PI/2.
-		var screen_angle := angle - PI * 0.5
+		# Negate angle: 3D cross-product positive = CCW (left), but screen CW = right.
+		var screen_angle := -angle - PI * 0.5
 
 		# Godot draw_arc wants start/end in radians, counterclockwise.
 		var start_angle := screen_angle - half_arc
@@ -105,11 +110,3 @@ func _draw() -> void:
 		draw_polyline(points, color, thickness, true)
 
 
-func _find_player() -> CharacterBody3D:
-	var players := get_tree().get_nodes_in_group("player")
-	if not players.is_empty():
-		return players[0] as CharacterBody3D
-	var p := get_tree().root.find_child("Player", true, false)
-	if p is CharacterBody3D:
-		return p
-	return null

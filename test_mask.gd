@@ -1,0 +1,16 @@
+extends SceneTree
+func _init():
+	var bt := AnimationNodeBlendTree.new()
+	var sm := AnimationNodeStateMachine.new()
+	var os := AnimationNodeOneShot.new()
+	bt.add_node("base", sm)
+	bt.add_node("os", os)
+	var anim_node = AnimationNodeAnimation.new()
+	bt.add_node("anim", anim_node)
+	bt.connect_node("os", 0, "base")
+	bt.connect_node("os", 1, "anim")
+	var out = AnimationNodeOutput.new()
+	bt.add_node("output", out)
+	bt.connect_node("output", 0, "os")
+	print("Connected successfully!")
+	quit()

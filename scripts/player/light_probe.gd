@@ -6,6 +6,8 @@ extends Node
 
 signal visibility_changed(value: float)
 
+const LightSampler := preload("res://scripts/common/light_sampler.gd")
+
 @export var probe_interval: float = 0.1
 @export var darkness_threshold: float = 0.15
 
@@ -55,14 +57,17 @@ func _physics_process(delta: float) -> void:
 
 	if _cached_omni_lights.is_empty() or _cache_timer >= CACHE_INTERVAL:
 		_cache_timer = 0.0
-		_cached_omni_lights = _find_omni_lights(get_tree().root)
+		_cached_omni_lights = LightSampler.find_omni_lights(get_tree().root)
 
 	var total_light := 0.0
 	var space_state := player.get_world_3d().direct_space_state
+	var exclude: Array[RID] = []
+	if _player_rid.is_valid():
+		exclude.append(_player_rid)
 
 	for light in _cached_omni_lights:
 		if is_instance_valid(light):
-			total_light += _sample_omni(light, player_pos, space_state)
+			total_light += LightSampler.sample_omni(light, player_pos, space_state, exclude)
 
 	total_light += _sample_directional_lights(player_pos, space_state)
 
@@ -76,31 +81,6 @@ func _check_daytime() -> bool:
 		return true
 	var t: float = cycle.time_of_day
 	return t >= 6.0 and t < 20.0
-
-
-func _sample_omni(light: OmniLight3D, sample_pos: Vector3, space: PhysicsDirectSpaceState3D) -> float:
-	if not light.visible:
-		return 0.0
-	var light_pos := light.global_position
-	var dist := sample_pos.distance_to(light_pos)
-	var range_val: float = light.omni_range
-	if dist >= range_val:
-		return 0.0
-
-	var atten_exp: float = light.omni_attenuation
-	var falloff := 1.0 - pow(dist / range_val, atten_exp)
-	falloff = maxf(falloff, 0.0)
-
-	var query := PhysicsRayQueryParameters3D.create(sample_pos, light_pos)
-	query.collision_mask = 1
-	query.hit_from_inside = false
-	if _player_rid.is_valid():
-		query.exclude = [_player_rid]
-	var result := space.intersect_ray(query)
-	if result and result.position.distance_to(light_pos) > 0.3:
-		return 0.0
-
-	return falloff * light.light_energy * 0.15
 
 
 func _sample_directional_lights(sample_pos: Vector3, space: PhysicsDirectSpaceState3D) -> float:
@@ -120,12 +100,3 @@ func _sample_directional_lights(sample_pos: Vector3, space: PhysicsDirectSpaceSt
 			if not result:
 				total += child.light_energy * 0.08
 	return total
-
-
-func _find_omni_lights(node: Node) -> Array[OmniLight3D]:
-	var lights: Array[OmniLight3D] = []
-	if node is OmniLight3D:
-		lights.append(node)
-	for child in node.get_children():
-		lights.append_array(_find_omni_lights(child))
-	return lights

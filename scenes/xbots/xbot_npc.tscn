@@ -2,6 +2,7 @@
 
 [ext_resource type="PackedScene" uid="uid://c60hntfmyew8k" path="res://assets/xbots/xbot_root.glb" id="1_glb"]
 [ext_resource type="AnimationLibrary" path="res://assets/animations/animation_libraries/npc_female_locomotion.res" id="2_npc_lib"]
+[ext_resource type="Script" uid="uid://ckggu0tcsecpj" path="res://scripts/xbots/xbot_animation_library.gd" id="3_script"]
 
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_idle"]
@@ -56,6 +57,7 @@ transitions = ["Start", "Idle", SubResource("t_start_idle"), "Idle", "Locomotion
 graph_offset = Vector2(-57, -221)
 
 [node name="xbot_npc" instance=ExtResource("1_glb")]
+script = ExtResource("3_script")
 
 [node name="AnimationPlayer" parent="." index="1"]
 libraries/NpcLoco = ExtResource("2_npc_lib")

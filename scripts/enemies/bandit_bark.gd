@@ -25,12 +25,12 @@ func _ready() -> void:
 	_audio.bus = &"SFX"
 	add_child(_audio)
 
-	var perception := get_parent().get_node_or_null("BanditPerception")
-	if not perception:
-		push_warning("[BanditBark] No BanditPerception on %s" % get_parent().name)
+	var brain := get_parent().get_node_or_null("BanditBrain")
+	if not brain:
+		push_warning("[BanditBark] No BanditBrain on %s" % get_parent().name)
 		return
-	perception.alert_level_changed.connect(_on_alert_level_changed)
-	perception.player_lost_in_darkness.connect(_on_player_lost)
+	brain.alert_level_changed.connect(_on_alert_level_changed)
+	brain.player_lost_in_darkness.connect(_on_player_lost)
 
 
 func _physics_process(delta: float) -> void:

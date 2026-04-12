@@ -1,7 +1,7 @@
 [gd_scene format=3]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hitbox"]
-size = Vector3(0.06, 0.55, 0.03)
+size = Vector3(0.25, 0.65, 0.25)
 
 [sub_resource type="BoxMesh" id="BoxMesh_blade"]
 size = Vector3(0.05, 0.6, 0.012)

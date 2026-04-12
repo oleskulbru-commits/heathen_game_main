@@ -11,7 +11,7 @@ const Helpers := preload("res://scripts/tools/anim_build_helpers.gd")
 
 const OUTPUT_DIR := "res://assets/animations/animation_libraries/"
 
-## Each entry: { glb source path → output .res filename }
+## Each entry: { glb source path → config dictionary or output .res filename }
 const SOURCES := {
 	"res://assets/animations/npc_animations/male_locomotion.glb":
 		"npc_male_locomotion.res",
@@ -23,8 +23,12 @@ const SOURCES := {
 		"npc_gestures.res",
 	"res://assets/animations/npc_animations/pro_axe_animation_pack.glb":
 		"npc_axe.res",
-	"res://assets/animations/npc_animations/pro_sword_and_shield_pack.glb":
-		"npc_sword_shield.res",
+	"res://assets/animations/npc_animations/pro_sword_and_shield_pack.glb": {
+		"output": "npc_sword_shield.res",
+		"loop_patterns": [
+			"idle", "walk", "run", "strafe",
+		],
+	},
 	"res://assets/animations/npc_animations/searching_pack.glb":
 		"npc_searching.res",
 }
@@ -34,15 +38,22 @@ func _init() -> void:
 	print("=== Rebuild NPC Animation Libraries ===\n")
 
 	for glb_path in SOURCES:
-		var res_name: String = SOURCES[glb_path]
+		var config = SOURCES[glb_path]
+		var res_name: String
+		var loop_patterns: Array = []
+		if config is String:
+			res_name = config
+		else:
+			res_name = str(config.get("output", ""))
+			loop_patterns = config.get("loop_patterns", [])
 		var out_path: String = OUTPUT_DIR + res_name
-		_build_library(glb_path, out_path)
+		_build_library(glb_path, out_path, loop_patterns)
 
 	print("\n=== All Done ===")
 	quit()
 
 
-func _build_library(glb_path: String, out_path: String) -> void:
+func _build_library(glb_path: String, out_path: String, loop_patterns: Array = []) -> void:
 	print("── ", glb_path, " ──")
 
 	var scene: PackedScene = load(glb_path) as PackedScene
@@ -64,8 +75,13 @@ func _build_library(glb_path: String, out_path: String) -> void:
 		var src_anim: Animation = player.get_animation(clip_name)
 		var lib_name := Helpers.sanitise_clip_name(clip_name)
 		var new_anim := Helpers.copy_animation(src_anim)
+		# Apply loop mode if name matches any loop pattern
+		if _should_loop(lib_name, loop_patterns):
+			new_anim.loop_mode = Animation.LOOP_LINEAR
+			print("    + '", lib_name, "': ", snapped(new_anim.length, 0.001), "s, ", new_anim.get_track_count(), " tracks  [LOOP]")
+		else:
+			print("    + '", lib_name, "': ", snapped(new_anim.length, 0.001), "s, ", new_anim.get_track_count(), " tracks")
 		lib.add_animation(lib_name, new_anim)
-		print("    + '", lib_name, "': ", snapped(new_anim.length, 0.001), "s, ", new_anim.get_track_count(), " tracks")
 
 	var err := ResourceSaver.save(lib, out_path)
 	if err != OK:
@@ -74,3 +90,12 @@ func _build_library(glb_path: String, out_path: String) -> void:
 		print("  SAVED: ", out_path, "  (", lib.get_animation_list().size(), " animations)\n")
 
 	inst.free()
+
+
+func _should_loop(anim_name: String, patterns: Array) -> bool:
+	if patterns.is_empty():
+		return false
+	for pattern in patterns:
+		if anim_name.contains(str(pattern)):
+			return true
+	return false

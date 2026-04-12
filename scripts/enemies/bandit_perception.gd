@@ -1,221 +1,94 @@
 extends Node
-## Handles sight, light-awareness, and sound detection for a bandit.
-## Attach as a child of the bandit CharacterBody3D.
-##
-## Continuous suspicion model: stimuli (sight & sound) feed a 0.0–1.0
-## suspicion float that rises while the player is detected and drains
-## when stimuli stop.  Alert level is derived from thresholds:
-##
-##   suspicion < curious   → 0  Unaware
-##   suspicion < alert     → 1  Curious   (heard/glimpsed — investigate LKP)
-##   suspicion < combat    → 2  Alert     (actively hunting LKP trail)
-##   suspicion >= combat   → 3  Combat    (pursue aggressively, call friends)
+## Sensing-only component for bandits.
+## Computes sight and sound stimuli, then reports them to BanditBrain.
 
-signal alert_level_changed(level: int)
-signal suspicion_changed(value: float)
-signal entered_combat()
-signal player_lost_in_darkness(last_known_pos: Vector3)
-signal heard_noise(source_pos: Vector3)
+const BanditShared := preload("res://scripts/enemies/bandit_shared.gd")
+const PlayerFinder := preload("res://scripts/common/player_finder.gd")
 
-# ── Sight ────────────────────────────────────────────────────────────────────
 @export var sight_range: float = 25.0
 @export var sight_fov_deg: float = 110.0
-@export var inner_fov_deg: float = 40.0             ## Phase 1: central vision cone
-@export var peripheral_rate_mult: float = 0.3        ## Phase 1: outer cone suspicion multiplier
+@export var inner_fov_deg: float = 40.0
+@export var peripheral_rate_mult: float = 0.5
 @export var sneak_detect_range: float = 1.0
+@export var darkness_stand_detect_range: float = 4.5
 @export var crouch_range_mult: float = 0.5
 @export var moving_range_mult: float = 1.3
 @export var sprint_range_mult: float = 1.5
-@export var sight_check_interval: float = 0.2
-@export var height_advantage_mult: float = 0.4      ## Phase 2: penalty when player is above
+@export var sight_check_interval: float = 0.05
+@export var height_advantage_mult: float = 0.4
+@export var instant_visual_combat: bool = false
 
-# ── Hearing ──────────────────────────────────────────────────────────────────
 @export var hearing_range_sprint: float = 20.0
 @export var hearing_range_walk: float = 8.0
 @export var hearing_range_crouch_walk: float = 3.0
-@export var sound_occlusion_mult: float = 0.3        ## Phase 3: hearing through walls
+@export var sound_occlusion_mult: float = 0.3
 
-# ── Suspicion ────────────────────────────────────────────────────────────────
-@export var suspicion_rate_sight: float = 0.5      ## per-second at full intensity
+@export var suspicion_rate_sight: float = 1.8
 @export var suspicion_rate_sound_sprint: float = 0.35
 @export var suspicion_rate_sound_walk: float = 0.15
 @export var suspicion_rate_sound_crouch: float = 0.05
-@export var suspicion_drain_rate: float = 0.12     ## per-second when no stimuli
-
-# ── Thresholds (0.0 – 1.0) ──────────────────────────────────────────────────
-@export var threshold_curious: float = 0.3
-@export var threshold_alert: float = 0.6
-@export var threshold_combat: float = 0.9
-
-# ── Alert behaviour ─────────────────────────────────────────────────────────
-@export var lkp_arrive_radius: float = 2.0
-@export var alert_decay_time: float = 8.0
-@export var pursuit_projection_dist: float = 8.0    ## Phase 5: how far ahead to project LKP
-
-# ── Post-search heightened awareness ─────────────────────────────────────────
-@export var heightened_duration: float = 30.0        ## Phase 6
-@export var heightened_sight_mult: float = 1.3       ## Phase 6
-@export var heightened_fov_bonus: float = 20.0       ## Phase 6
-
-# ── Exposure accumulator (Phase 1d) ─────────────────────────────────────────
-@export var exposure_buildup_rate: float = 2.5   ## 0→1 in 0.4 s of unbroken LOS
-@export var exposure_drain_rate: float = 0.8     ## 1→0 in 1.25 s out of LOS
-
-# ── De-escalation (Phase 1c) ─────────────────────────────────────────────────
-@export var deescalate_time: float = 4.0         ## seconds below threshold before stepping down
-
-var alert_level: int = 0
-var suspicion: float = 0.0
-var last_known_positions: Array[Vector3] = []
+@export var suspicion_drain_rate: float = 0.12
+@export var exposure_buildup_rate: float = 2.5
+@export var exposure_drain_rate: float = 0.8
 
 var _sight_timer: float = 0.0
-var _decay_timer: float = 0.0
-var _suspicion_input: float = 0.0   # total rate this frame
-var _sight_rate: float = 0.0        # persists between sight checks
+var _suspicion_input: float = 0.0
+var _sight_rate: float = 0.0
 var _player_ref: CharacterBody3D
 var _light_probe: Node
 var _bandit: CharacterBody3D
-var _torch_search: Node
-var _body_detector: Node
-
-# ── Velocity pursuit projection (Phase 5) ────────────────────────────────────
-var _player_last_velocity: Vector3 = Vector3.ZERO
-
-# ── Exposure & de-escalation (Phase 1c / 1d) ─────────────────────────────────
-var _exposure: float = 0.0                   # 0–1: how long bandit has clearly seen the player
-var _player_visible_last_frame: bool = false # set true only on an unobstructed LOS check
-var _deescalate_timer: float = 0.0           # counts up when new_level < alert_level
-
-# ── Post-search heightened awareness (Phase 6) ──────────────────────────────
-var _heightened_timer: float = 0.0
-
-# ── Stealth-aware A* routing (alert_level 1–2) ──────────────────────────────
-var _stealth_grid: StealthNavGrid
-var _stealth_waypoints: PackedVector3Array = PackedVector3Array()
-var _stealth_wp_index: int = 0
-var _stealth_target: Vector3 = Vector3.INF
-const _STEALTH_WP_ARRIVE := 2.5
-const _STEALTH_REBUILD_TIME := 10.0
-var _stealth_age: float = 0.0
+var _brain: Node
 
 
 func _ready() -> void:
 	_bandit = get_parent() as CharacterBody3D
 	await get_tree().process_frame
-	_player_ref = _find_player()
+	_player_ref = PlayerFinder.find(get_tree())
 	if _player_ref:
 		_light_probe = _player_ref.get_node_or_null("LightProbe")
-	_torch_search = _bandit.get_node_or_null("BanditTorchSearch")
-	_body_detector = _bandit.get_node_or_null("BanditBodyDetector")
+	if _bandit:
+		_brain = _bandit.get_node_or_null("BanditBrain")
+	_sight_timer = sight_check_interval
 
 
 func _physics_process(delta: float) -> void:
-	if not _player_ref or not _bandit:
+	if not _player_ref or not _bandit or not _brain:
+		return
+	if _player_ref.has_method("is_dead") and bool(_player_ref.is_dead()):
+		_sight_rate = 0.0
+		_suspicion_input = 0.0
+		_brain.set_visual_contact(false)
+		if _brain.alert_level != 0 and _brain.has_method("reset_alert"):
+			_brain.reset_alert()
 		return
 
-	# Phase 6: Tick heightened awareness timer
-	if _heightened_timer > 0.0:
-		_heightened_timer = maxf(_heightened_timer - delta, 0.0)
-
-	_suspicion_input = _sight_rate   # carry sight rate between checks
+	_brain.update_player_state(_player_ref.global_position, _player_ref.velocity)
+	_suspicion_input = _sight_rate
 	_sight_timer += delta
 
 	if _sight_timer >= sight_check_interval:
 		_sight_timer = 0.0
 		_check_sight()
-		_suspicion_input = _sight_rate   # update with fresh value
+		_suspicion_input = _sight_rate
 
-	# ── Phase 1d: Exposure accumulator ──────────────────────────────────
-	if _player_visible_last_frame:
-		_exposure = minf(_exposure + exposure_buildup_rate * delta, 1.0)
-	else:
-		_exposure = maxf(_exposure - exposure_drain_rate * delta, 0.0)
-
+	_brain.update_exposure(_brain.has_visual_contact(), delta, exposure_buildup_rate, exposure_drain_rate)
 	_check_sound()
 
-	# ── Suspicion rise / drain ──────────────────────────────────
+	var next_suspicion: float = float(_brain.suspicion)
 	if _suspicion_input > 0.0:
-		suspicion = minf(suspicion + _suspicion_input * delta, 1.0)
-		_decay_timer = 0.0
+		next_suspicion = minf(next_suspicion + _suspicion_input * delta, 1.0)
 	else:
-		# Phase 1d: high exposure slows drain so recently-seen players can’t instantly hide
-		var eff_drain := suspicion_drain_rate * (1.0 - _exposure * 0.7)
-		suspicion = maxf(suspicion - eff_drain * delta, 0.0)
+		var eff_drain: float = suspicion_drain_rate * (1.0 - float(_brain.get_exposure()) * 0.7)
+		next_suspicion = maxf(next_suspicion - eff_drain * delta, 0.0)
 
-	suspicion_changed.emit(suspicion)
-
-	# ── Derive alert level from thresholds (only goes UP via suspicion) ─
-	var new_level := 0
-	if suspicion >= threshold_combat:
-		new_level = 3
-	elif suspicion >= threshold_alert:
-		new_level = 2
-	elif suspicion >= threshold_curious:
-		new_level = 1
-
-	if new_level > alert_level:
-		alert_level = new_level
-		_deescalate_timer = 0.0
-		alert_level_changed.emit(alert_level)
-		if alert_level == 3:
-			entered_combat.emit()
-			_call_nearby_bandits()
-	elif new_level < alert_level:
-		# Phase 1c: de-escalate gradually so brief breaks don’t instantly calm the bandit
-		_deescalate_timer += delta
-		if _deescalate_timer >= deescalate_time:
-			_deescalate_timer = 0.0
-			alert_level = maxi(alert_level - 1, new_level)
-			alert_level_changed.emit(alert_level)
-	else:
-		_deescalate_timer = 0.0
-
-	# ── Alert decay — lose interest when suspicion drains to zero ───────
-	if suspicion <= 0.0 and alert_level > 0:
-		_decay_timer += delta
-		if _decay_timer >= alert_decay_time:
-			var old_level := alert_level
-			_decay_timer = 0.0
-			alert_level = maxi(alert_level - 1, 0)
-			alert_level_changed.emit(alert_level)
-
-			# Phase 5: When dropping from combat, project LKP along player’s last velocity
-			if old_level == 3 and alert_level == 2:
-				if not last_known_positions.is_empty() and _player_last_velocity.length() > 0.5:
-					var projected := last_known_positions[-1] + _player_last_velocity.normalized() * pursuit_projection_dist
-					last_known_positions.insert(0, projected)
-
-			if alert_level == 0:
-				if not last_known_positions.is_empty():
-					player_lost_in_darkness.emit(last_known_positions[-1])
-				last_known_positions.clear()
-				# Phase 6: Start heightened awareness
-				_heightened_timer = heightened_duration
-
-	# ── Navigate toward last-known positions ────────────────────────────
-	if _torch_search and _torch_search.is_searching():
-		pass
-	elif alert_level >= 1 and not last_known_positions.is_empty():
-		var target := last_known_positions[0]
-		var dist := _bandit.global_position.distance_to(target)
-		if dist < lkp_arrive_radius:
-			last_known_positions.pop_front()
-			_stealth_waypoints = PackedVector3Array()
-			_stealth_wp_index = 0
-			_stealth_target = Vector3.INF
-			if last_known_positions.is_empty() and _suspicion_input <= 0.0:
-				player_lost_in_darkness.emit(target)
-		elif alert_level == 1 and _bandit.has_method("set_target"):
-			_navigate_stealth(target, delta)
-		elif _bandit.has_method("set_target"):
-			_bandit.set_target(target)
+	_brain.apply_suspicion(next_suspicion, delta, _suspicion_input > 0.0)
 
 
 func _check_sight() -> void:
-	_sight_rate = 0.0   # clear — will be set if player is visible
-	_player_visible_last_frame = false  # Phase 1d: pessimistic default; only true on clear LOS
-	var player_pos := _player_ref.global_position + Vector3(0.0, 1.0, 0.0)
-	var bandit_pos := _bandit.global_position + Vector3(0.0, 1.5, 0.0)
+	_sight_rate = 0.0
+	_brain.set_visual_contact(false)
+	var player_pos := _player_ref.global_position + BanditShared.PLAYER_CHEST_HEIGHT
+	var bandit_pos := _bandit.global_position + BanditShared.BANDIT_EYE_HEIGHT
 	var to_player := player_pos - bandit_pos
 	var dist := to_player.length()
 
@@ -224,18 +97,17 @@ func _check_sight() -> void:
 	if _light_probe and _light_probe.has_method("get_visibility"):
 		visibility = _light_probe.get_visibility()
 
-	var effective_range := sneak_detect_range + (sight_range - sneak_detect_range) * sqrt(visibility)
-
-	# Phase 6: Heightened post-search awareness boosts range
-	if _heightened_timer > 0.0:
-		effective_range *= heightened_sight_mult
-
-	# Crouching halves the effective range
 	var is_crouching := false
 	if _player_ref.has_method("is_in_stealth"):
 		is_crouching = _player_ref.is_in_stealth()
+	var light_factor := clampf(sqrt(visibility), 0.0, 1.0)
+	var effective_range := sight_range
 	if is_crouching:
-		effective_range *= crouch_range_mult
+		effective_range = lerpf(sneak_detect_range, sight_range * crouch_range_mult, light_factor)
+	else:
+		effective_range = lerpf(darkness_stand_detect_range, sight_range, light_factor)
+
+	effective_range *= _brain.get_heightened_sight_multiplier()
 
 	# Movement amplifies visual exposure
 	var player_moving := false
@@ -268,10 +140,8 @@ func _check_sight() -> void:
 	dir_to_player.y = 0.0
 	dir_to_player = dir_to_player.normalized()
 
-	# Phase 6: Heightened awareness widens FOV
 	var current_fov := sight_fov_deg
-	if _heightened_timer > 0.0:
-		current_fov += heightened_fov_bonus
+	current_fov += _brain.get_heightened_fov_bonus()
 
 	var angle := acos(clampf(bandit_forward.dot(dir_to_player), -1.0, 1.0))
 	if angle > deg_to_rad(current_fov * 0.5):
@@ -306,8 +176,10 @@ func _check_sight() -> void:
 	var intensity := proximity * maxf(visibility, 0.15)
 	# Phase 1a: partial LOS contributes proportionally
 	_sight_rate = suspicion_rate_sight * intensity * fov_multiplier * vis_fraction
-	_player_visible_last_frame = true
-	_record_lkp(player_pos)
+	_brain.set_visual_contact(true)
+	_brain.remember_last_known_position(player_base)
+	if instant_visual_combat:
+		_brain.force_combat(player_base)
 
 
 func _check_sound() -> void:
@@ -355,28 +227,27 @@ func _check_sound() -> void:
 	if player_sprinting and dist <= eff_sprint:
 		var proximity := 1.0 - clampf(dist / eff_sprint, 0.0, 1.0)
 		_suspicion_input += suspicion_rate_sound_sprint * proximity
-		_record_lkp(sound_pos)
+		_brain.remember_last_known_position(sound_pos)
 		heard = true
 	elif player_moving and player_crouching and dist <= eff_crouch:
 		var proximity := 1.0 - clampf(dist / eff_crouch, 0.0, 1.0)
 		_suspicion_input += suspicion_rate_sound_crouch * proximity
-		_record_lkp(sound_pos)
+		_brain.remember_last_known_position(sound_pos)
 		heard = true
 	elif player_moving and not player_crouching and dist <= eff_walk:
 		var proximity := 1.0 - clampf(dist / eff_walk, 0.0, 1.0)
 		_suspicion_input += suspicion_rate_sound_walk * proximity
-		_record_lkp(sound_pos)
+		_brain.remember_last_known_position(sound_pos)
 		heard = true
 
-	# Phase 1b / Phase 4: Emit approximate position — prevents pinpoint tracking via sound
-	if heard and alert_level == 0:
-		heard_noise.emit(_approximate_sound_pos(sound_pos))
+	if heard and _brain.alert_level == 0:
+		_brain.emit_heard_noise(_approximate_sound_pos(sound_pos))
 
 
 func _approximate_sound_pos(exact_pos: Vector3) -> Vector3:
 	## Phase 1b: Snaps to a 3 m grid then adds distance-proportional noise.
 	## Bandits hear “roughly where” not “exactly where” the player made a sound.
-	var snapped := Vector3(
+	var snapped_pos := Vector3(
 		roundf(exact_pos.x / 3.0) * 3.0,
 		exact_pos.y,
 		roundf(exact_pos.z / 3.0) * 3.0,
@@ -384,130 +255,12 @@ func _approximate_sound_pos(exact_pos: Vector3) -> Vector3:
 	var dist := _bandit.global_position.distance_to(exact_pos)
 	var noise := clampf(dist / 20.0, 0.0, 1.0) * 1.5
 	if noise > 0.01:
-		snapped.x += randf_range(-noise, noise)
-		snapped.z += randf_range(-noise, noise)
-	return snapped
+		snapped_pos.x += randf_range(-noise, noise)
+		snapped_pos.z += randf_range(-noise, noise)
+	return snapped_pos
 
 
-func _record_lkp(position: Vector3) -> void:
-	# Phase 5: Capture player velocity for pursuit projection
-	if _player_ref:
-		_player_last_velocity = _player_ref.velocity
-	if last_known_positions.is_empty() or last_known_positions[-1].distance_to(position) > 2.0:
-		last_known_positions.append(position)
-
-
-func _call_nearby_bandits() -> void:
-	var call_range := 40.0
-	var nearby: Array[Node] = []
-	for node in get_tree().get_nodes_in_group("bandit"):
-		if node == _bandit:
-			continue
-		if node.global_position.distance_to(_bandit.global_position) <= call_range:
-			nearby.append(node)
-
-	# Phase 7: Distribute unique search offsets so guards fan out
-	var search_center := last_known_positions[-1] if not last_known_positions.is_empty() else _bandit.global_position
-	var distributed := _distribute_search_positions(search_center, nearby.size())
-
-	for i in nearby.size():
-		var node := nearby[i]
-		var perception := node.get_node_or_null("BanditPerception")
-		if perception and perception.alert_level < 3:
-			perception.suspicion = 1.0
-			perception.alert_level = 3
-			# Each guard gets a unique offset position first, then shared LKP trail
-			var lkps: Array[Vector3] = []
-			if i < distributed.size():
-				lkps.append(distributed[i])
-			if not last_known_positions.is_empty():
-				lkps.append_array(last_known_positions)
-			perception.last_known_positions = lkps
-			perception.alert_level_changed.emit(3)
-			perception.entered_combat.emit()
-
-
-func _distribute_search_positions(center: Vector3, count: int) -> Array[Vector3]:
-	var positions: Array[Vector3] = []
-	if count <= 0:
-		return positions
-	var radius := 8.0
-	for i in count:
-		var angle_rad := TAU * float(i) / float(count)
-		var offset := Vector3(cos(angle_rad) * radius, 0.0, sin(angle_rad) * radius)
-		positions.append(center + offset)
-	return positions
-
-
-func reset_alert() -> void:
-	alert_level = 0
-	suspicion = 0.0
-	last_known_positions.clear()
-	_decay_timer = 0.0
-	_heightened_timer = 0.0
-	_player_last_velocity = Vector3.ZERO
-	_exposure = 0.0
-	_player_visible_last_frame = false
-	_deescalate_timer = 0.0
-	_stealth_waypoints = PackedVector3Array()
-	_stealth_wp_index = 0
-	_stealth_target = Vector3.INF
-	_stealth_grid = null
-	alert_level_changed.emit(0)
-	suspicion_changed.emit(0.0)
-
-
-func _navigate_stealth(target: Vector3, delta: float) -> void:
-	_stealth_age += delta
-	var needs_rebuild := _stealth_waypoints.is_empty() \
-		or _stealth_target.distance_to(target) > 4.0 \
-		or _stealth_age >= _STEALTH_REBUILD_TIME
-
-	if needs_rebuild:
-		_stealth_grid = StealthNavGrid.new()
-		var mid := (_bandit.global_position + target) * 0.5
-		_stealth_grid.build(mid, _bandit.get_world_3d(), _bandit.get_tree())
-		if _stealth_grid.is_valid():
-			_stealth_waypoints = _stealth_grid.get_stealth_path(
-				_bandit.global_position, target)
-			_stealth_wp_index = 0
-			_stealth_target = target
-			_stealth_age = 0.0
-		else:
-			_stealth_waypoints = PackedVector3Array()
-
-	if _stealth_waypoints.is_empty():
-		_bandit.set_target(target)
-		return
-
-	if _stealth_wp_index >= _stealth_waypoints.size():
-		_bandit.set_target(target)
-		_stealth_waypoints = PackedVector3Array()
-		return
-
-	var wp := _stealth_waypoints[_stealth_wp_index]
-	var wp_dist := _bandit.global_position.distance_to(wp)
-	if wp_dist < _STEALTH_WP_ARRIVE:
-		_stealth_wp_index += 1
-		if _stealth_wp_index >= _stealth_waypoints.size():
-			_bandit.set_target(target)
-			_stealth_waypoints = PackedVector3Array()
-			return
-		wp = _stealth_waypoints[_stealth_wp_index]
-	_bandit.set_target(wp)
-
-
-func _find_player() -> CharacterBody3D:
-	var players := get_tree().get_nodes_in_group("player")
-	if not players.is_empty():
-		return players[0] as CharacterBody3D
-	var p := get_tree().root.find_child("Player", true, false)
-	if p is CharacterBody3D:
-		return p
-	return null
-
-
-# ── Terrain locomotion integration ───────────────────────────────────────────
+ # ── Terrain locomotion integration ──────────────────────────────────────────
 
 func _get_terrain_noise_mult() -> float:
 	if not _player_ref:

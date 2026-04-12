@@ -19,15 +19,19 @@ extends Node
 ## Only torches within this distance of the bandit's spawn are added to his patrol route.
 ## Prevents a guard posted at the longhouse from walking to the dock torch.
 @export var patrol_radius: float = 30.0
+## Reject snapped floor anchors that land too far from the torch they came from.
+@export var waypoint_snap_tolerance: float = 4.0
+## Merge nearby torch anchors so a cluster of decorative flames does not become a zero-length route.
+@export var waypoint_merge_radius: float = 2.5
+## If distance to the current waypoint is not improving for this long, skip or abandon it.
+@export var walk_stuck_timeout: float = 2.5
+## Minimum horizontal progress that resets the stuck timer while walking.
+@export var walk_progress_epsilon: float = 0.15
 
 const BanditShared := preload("res://scripts/enemies/bandit_shared.gd")
+const DEFAULT_BANDIT_MOVE_SPEED := 3.5
 
-const LINGER_LOOK_ANIMS: Array[String] = [
-	"look_around_02",
-	"look_around_03",
-	"look_around_04",
-	"looking_around",
-]
+
 
 ## POSTED = standing idle at home post (no-torch default)
 enum State { INACTIVE, WALKING, LINGERING, POSTED }
@@ -37,7 +41,8 @@ var _has_torch_route: bool = false   # true when real torch waypoints were found
 var _wander_timer: float = 0.0       # counts down; when 0 bandit does a short wander
 var _wander_returning: bool = false  # true when walking back home after a wander
 var _bandit: CharacterBody3D
-var _perception: Node
+var _nav_agent: NavigationAgent3D
+var _brain: Node
 var _torch_search: Node
 var _anim_player: AnimationPlayer
 var _anim_tree: AnimationTree
@@ -47,6 +52,9 @@ var _current_wp: int = 0
 var _linger_anim_count: int = 0
 var _linger_max_anims: int = 1
 var _normal_speed: float
+var _last_walk_dist: float = INF
+var _walk_stuck_time: float = 0.0
+var _pending_waypoint_build: bool = false
 
 
 func _ready() -> void:
@@ -54,26 +62,23 @@ func _ready() -> void:
 	if not _bandit:
 		return
 
-	_perception = _bandit.get_node_or_null("BanditPerception")
+	_nav_agent = _bandit.get_node_or_null("NavigationAgent3D") as NavigationAgent3D
+	_brain = _bandit.get_node_or_null("BanditBrain")
 	_torch_search = _bandit.get_node_or_null("BanditTorchSearch")
 
-	var visual_root := _bandit.get_node_or_null("ybot_root") as Node3D
-	if visual_root:
-		_anim_player = visual_root.get_node_or_null("AnimationPlayer") as AnimationPlayer
-		_anim_tree = visual_root.get_node_or_null("AnimationTree") as AnimationTree
-		_skeleton = visual_root.get_node_or_null("Armature/Skeleton3D") as Skeleton3D
+	var nodes := BanditShared.resolve_visual_nodes(_bandit)
+	_anim_player = nodes["anim_player"]
+	_anim_tree = nodes["anim_tree"]
+	_skeleton = nodes["skeleton"]
 
-	_normal_speed = _bandit.move_speed
+	_normal_speed = _get_bandit_move_speed()
 
-	# Load searching library for linger animations
-	if _anim_player:
-		var lib := load(BanditShared.LIB_PATH) as AnimationLibrary
-		if lib and not _anim_player.has_animation_library(BanditShared.LIB_NAME):
-			_anim_player.add_animation_library(BanditShared.LIB_NAME, lib)
+	BanditShared.load_searching_library(_anim_player)
 
-	# Wait one frame so all torches are in the tree
+	# Wait one frame so all torches are in the tree.
 	await get_tree().process_frame
-	_build_waypoints()
+	_pending_waypoint_build = true
+	_try_finish_waypoint_build()
 
 	if _has_torch_route:
 		# Real patrol route — start walking immediately
@@ -86,9 +91,12 @@ func _ready() -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	if _pending_waypoint_build:
+		_try_finish_waypoint_build()
+
 	# Auto pause / resume based on alert and search state
 	var should_pause := false
-	if _perception and _perception.alert_level > 0:
+	if _brain and _brain.alert_level > 0:
 		should_pause = true
 	if _torch_search and _torch_search.is_searching():
 		should_pause = true
@@ -104,25 +112,31 @@ func _physics_process(_delta: float) -> void:
 
 	match _state:
 		State.WALKING:
-			_process_walking()
+			_process_walking(_delta)
 		State.LINGERING:
 			_process_lingering()
 		State.POSTED:
 			_process_posted(_delta)
 
 
-func _process_walking() -> void:
+func _process_walking(delta: float) -> void:
 	if _waypoints.is_empty():
 		return
 	var target := _waypoints[_current_wp]
-	# Use XZ-only distance so elevated torch props don't prevent arrival
-	var dist := Vector2(
-			_bandit.global_position.x - target.x,
-			_bandit.global_position.z - target.z).length()
-	if dist < arrive_radius:
-		if _has_torch_route:
+	var dist := _horizontal_distance(_bandit.global_position, target)
+	_track_walk_progress(dist, delta)
+	var nav_finished: bool = _nav_agent.is_navigation_finished() if _nav_agent else true
+	if _has_torch_route and nav_finished and dist < arrive_radius:
+		_change_state(State.LINGERING)
+		return
+	if _has_torch_route and _walk_stuck_time >= walk_stuck_timeout:
+		if dist < arrive_radius * 1.5:
 			_change_state(State.LINGERING)
 		else:
+			_skip_blocked_waypoint()
+		return
+	if dist < arrive_radius:
+		if not _has_torch_route:
 			# Wander trip complete — return home or stand at post
 			if _wander_returning:
 				_wander_returning = false
@@ -132,8 +146,9 @@ func _process_walking() -> void:
 			else:
 				# Reached wander point, now head home
 				_wander_returning = true
-				_waypoints = [_bandit.home_position]
+				_waypoints = [_get_bandit_home_position()]
 				_current_wp = 0
+		return
 	else:
 		_bandit.set_target(target)
 
@@ -167,7 +182,8 @@ func _change_state(new_state: State) -> void:
 	_state = new_state
 	match new_state:
 		State.WALKING:
-			_bandit.move_speed = patrol_speed
+			_set_bandit_move_speed(patrol_speed)
+			_reset_walk_tracking()
 			_reactivate_tree()
 		State.LINGERING:
 			_linger_anim_count = 0
@@ -179,8 +195,11 @@ func _change_state(new_state: State) -> void:
 		State.POSTED:
 			# Stand still at home post
 			_stop_movement()
-			_bandit.move_speed = _normal_speed
-			_reactivate_tree()
+			_set_bandit_move_speed(_normal_speed)
+			if _bandit.has_method("refresh_idle_animation"):
+				_bandit.call("refresh_idle_animation")
+			else:
+				_reactivate_tree()
 		State.INACTIVE:
 			pass
 
@@ -189,7 +208,7 @@ func _pause() -> void:
 	if _state == State.LINGERING and _anim_tree:
 		_reactivate_tree()
 	_state = State.INACTIVE
-	_bandit.move_speed = _normal_speed
+	_set_bandit_move_speed(_normal_speed)
 
 
 func _resume() -> void:
@@ -206,15 +225,14 @@ func _reset_wander_timer() -> void:
 
 func _do_wander() -> void:
 	## Pick a random navmesh-snapped point near home and walk there.
-	var nav_agent := _bandit.get_node_or_null("NavigationAgent3D") as NavigationAgent3D
-	var map_rid: RID
-	if nav_agent:
-		map_rid = nav_agent.get_navigation_map()
+	if not _is_navigation_map_ready():
+		# NavigationServer may not have completed its first sync yet.
+		_wander_timer = 0.25
+		return
 	var angle := randf() * TAU
 	var dist := randf_range(wander_radius * 0.4, wander_radius)
-	var candidate: Vector3 = _bandit.home_position + Vector3(cos(angle) * dist, 0.0, sin(angle) * dist)
-	if map_rid.is_valid():
-		candidate = NavigationServer3D.map_get_closest_point(map_rid, candidate)
+	var candidate: Vector3 = _get_bandit_home_position() + Vector3(cos(angle) * dist, 0.0, sin(angle) * dist)
+	candidate = _snap_to_navigation(candidate)
 	_waypoints = [candidate]
 	_current_wp = 0
 	_wander_returning = false
@@ -224,23 +242,40 @@ func _do_wander() -> void:
 # ── Waypoints ────────────────────────────────────────────────────────────────
 
 func _build_waypoints() -> void:
-	var torches: Array[Node] = []
-	torches.append_array(get_tree().get_nodes_in_group("torch"))
-	if torches.is_empty():
-		torches.append_array(get_tree().get_nodes_in_group("flame"))
-	var home: Vector3 = _bandit.home_position
-	var nav_agent := _bandit.get_node_or_null("NavigationAgent3D") as NavigationAgent3D
-	var map_rid: RID
-	if nav_agent:
-		map_rid = nav_agent.get_navigation_map()
+	var torches: Array[Node] = BanditShared.get_all_torches(get_tree())
+	var home: Vector3 = _get_bandit_home_position()
+	var valid_points: Array[Vector3] = []
 	for t in torches:
 		if t is Node3D and t.global_position.distance_to(home) <= patrol_radius:
-			var wp: Vector3 = t.global_position
-			if map_rid.is_valid():
-				wp = NavigationServer3D.map_get_closest_point(map_rid, wp)
-			_waypoints.append(wp)
+			var source: Vector3 = t.global_position
+			var wp: Vector3 = _snap_to_navigation(source)
+			if _has_navigation_map() and _horizontal_distance(source, wp) > waypoint_snap_tolerance:
+				continue
+			var is_duplicate := false
+			for existing in valid_points:
+				if _horizontal_distance(existing, wp) <= waypoint_merge_radius:
+					is_duplicate = true
+					break
+			if not is_duplicate:
+				valid_points.append(wp)
+	valid_points.sort_custom(func(a: Vector3, b: Vector3) -> bool:
+		var angle_a := wrapf(atan2(a.z - home.z, a.x - home.x), 0.0, TAU)
+		var angle_b := wrapf(atan2(b.z - home.z, b.x - home.x), 0.0, TAU)
+		return angle_a < angle_b
+	)
+	_waypoints = valid_points
 	_has_torch_route = not _waypoints.is_empty()
 	# No nearby torches: stand at post and wander occasionally.
+
+
+func _try_finish_waypoint_build() -> void:
+	if not _can_build_nav_snapped_points():
+		return
+	_build_waypoints()
+	_pending_waypoint_build = false
+	if _has_torch_route and (_state == State.POSTED or _state == State.INACTIVE):
+		_find_nearest_waypoint()
+		_change_state(State.WALKING)
 
 
 func _find_nearest_waypoint() -> void:
@@ -265,17 +300,107 @@ func is_patrolling() -> bool:
 func _play_linger_anim() -> void:
 	if not _anim_player:
 		return
-	var pick: String = LINGER_LOOK_ANIMS[randi() % LINGER_LOOK_ANIMS.size()]
+	var pick: String = BanditShared.LOOK_AROUND_ANIMS[randi() % BanditShared.LOOK_AROUND_ANIMS.size()]
 	var anim_name := StringName(str(BanditShared.LIB_NAME) + "/" + pick)
 	if _anim_player.has_animation(anim_name):
 		_anim_player.play(anim_name, 0.3)
 
 
 func _reactivate_tree() -> void:
-	if _anim_tree and not _anim_tree.active:
-		_anim_tree.active = true
+	BanditShared.reactivate_tree(_anim_tree)
+
+
+func _reset_walk_tracking() -> void:
+	_last_walk_dist = INF
+	_walk_stuck_time = 0.0
+
+
+func _track_walk_progress(dist: float, delta: float) -> void:
+	if _last_walk_dist == INF or dist < _last_walk_dist - walk_progress_epsilon:
+		_walk_stuck_time = 0.0
+	else:
+		_walk_stuck_time += delta
+	_last_walk_dist = dist
+
+
+func _skip_blocked_waypoint() -> void:
+	if _waypoints.size() > 1:
+		_current_wp = (_current_wp + 1) % _waypoints.size()
+		_reset_walk_tracking()
+		return
+	_has_torch_route = false
+	_waypoints.clear()
+	_reset_wander_timer()
+	_change_state(State.POSTED)
+
+
+func _horizontal_distance(a: Vector3, b: Vector3) -> float:
+	return Vector2(a.x - b.x, a.z - b.z).length()
 
 
 func _stop_movement() -> void:
+	_reset_walk_tracking()
 	_bandit.velocity = Vector3.ZERO
-	_bandit.nav_agent.target_position = _bandit.global_position
+
+
+func _get_bandit_home_position() -> Vector3:
+	var home_value: Variant = _bandit.get("home_position")
+	if home_value is Vector3:
+		return home_value
+	return _bandit.global_position
+
+
+func _get_navigation_map_rid() -> RID:
+	if _nav_agent:
+		return _nav_agent.get_navigation_map()
+	return RID()
+
+
+func _has_navigation_map() -> bool:
+	return _get_navigation_map_rid().is_valid()
+
+
+func _is_navigation_map_ready() -> bool:
+	if not _nav_agent:
+		return true
+	var map_rid := _get_navigation_map_rid()
+	if not map_rid.is_valid():
+		return false
+	return NavigationServer3D.map_get_iteration_id(map_rid) > 0
+
+
+func _can_build_nav_snapped_points() -> bool:
+	return not _has_navigation_map() or _is_navigation_map_ready()
+
+
+func _snap_to_navigation(point: Vector3) -> Vector3:
+	var map_rid := _get_navigation_map_rid()
+	if not map_rid.is_valid():
+		return point
+	if NavigationServer3D.map_get_iteration_id(map_rid) <= 0:
+		return point
+	return NavigationServer3D.map_get_closest_point(map_rid, point)
+
+
+func _get_bandit_move_speed() -> float:
+	if _bandit.has_method("get_desired_move_speed"):
+		var desired_speed_value: Variant = _bandit.call("get_desired_move_speed")
+		if desired_speed_value is float:
+			return desired_speed_value
+		if desired_speed_value is int:
+			return float(desired_speed_value)
+	var speed_value: Variant = _bandit.get("move_speed")
+	if speed_value is float:
+		return speed_value
+	if speed_value is int:
+		return float(speed_value)
+	return DEFAULT_BANDIT_MOVE_SPEED
+
+
+func _set_bandit_move_speed(value: float) -> void:
+	if _bandit.has_method("set_desired_move_speed"):
+		_bandit.call("set_desired_move_speed", value)
+	elif _bandit.get("move_speed") != null:
+		_bandit.set("move_speed", value)
+	if _nav_agent:
+		_nav_agent.target_position = _bandit.global_position
