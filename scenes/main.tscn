@@ -38,6 +38,7 @@
 [ext_resource type="PackedScene" uid="uid://dfpatff4d5okj" path="res://addons/godot_3d_cursor/scenes/3d_cursor.tscn" id="34_j8jky"]
 [ext_resource type="PackedScene" path="res://scenes/npcs/villagers/villager_male.tscn" id="37_pibwh"]
 [ext_resource type="PackedScene" path="res://scenes/npcs/villagers/villager_female.tscn" id="38_c6pm6"]
+[ext_resource type="Script" path="res://scripts/enemies/squad_manager.gd" id="39_squad"]
 
 [sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_env01"]
 rayleigh_color = Color(0.26, 0.41, 0.58, 1)
@@ -287,6 +288,9 @@ transform = Transform3D(-0.5780143, 0, 0.81602675, 0, 1, 0, -0.81602675, 0, -0.5
 
 [node name="Bandit" parent="Levels/Settlements/Frafjord" unique_id=1145995685 instance=ExtResource("4_jyhfs")]
 transform = Transform3D(0.6757575, 0, 0.737124, 0, 1, 0, -0.737124, 0, 0.6757575, 30.830078, 1.965761, 7.0166016)
+
+[node name="SquadManager" type="Node" parent="Levels/Settlements/Frafjord"]
+script = ExtResource("39_squad")
 
 [node name="Torches" type="Node3D" parent="Levels/Settlements/Frafjord" unique_id=1355762678]
 transform = Transform3D(0.6757575, 0, 0.737124, 0, 1, 0, -0.737124, 0, 0.6757575, -11101.473, 0, -1216.9487)

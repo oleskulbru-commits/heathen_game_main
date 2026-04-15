@@ -260,7 +260,7 @@ func _approximate_sound_pos(exact_pos: Vector3) -> Vector3:
 	return snapped_pos
 
 
- # ── Terrain locomotion integration ──────────────────────────────────────────
+# ── Terrain locomotion integration ──────────────────────────────────────────
 
 func _get_terrain_noise_mult() -> float:
 	if not _player_ref:

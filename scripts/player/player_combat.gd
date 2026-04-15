@@ -70,6 +70,7 @@ var _dodge_duration: float = 0.0
 var _dodge_velocity: Vector3 = Vector3.ZERO
 var _dodge_iframe_start: float = 0.0
 var _dodge_iframe_end: float = 0.0
+var _dodge_movement_ended: bool = false
 var _blocking: bool = false
 var _hit_targets: Array[Node] = []
 var _disabled: bool = false
@@ -229,7 +230,9 @@ func request_kick() -> bool:
 
 
 func request_dodge(move_dir: Vector3, move_input: Vector2, dive: bool) -> bool:
-	if _disabled or _current_attack != AttackKind.NONE or _react_lock_remaining > 0.0 or _block_react_remaining > 0.0 or _dodge_duration > 0.0:
+	if _disabled or _current_attack != AttackKind.NONE or _react_lock_remaining > 0.0 or _block_react_remaining > 0.0:
+		return false
+	if _dodge_duration > 0.0 and not _dodge_movement_ended:
 		return false
 	if move_dir.length_squared() <= 0.0001:
 		return false
@@ -247,6 +250,7 @@ func request_dodge(move_dir: Vector3, move_input: Vector2, dive: bool) -> bool:
 	var anim_res := _anim_player.get_animation(anim)
 	_dodge_duration = maxf(anim_res.length if anim_res else 0.45, 0.1)
 	_dodge_elapsed = 0.0
+	_dodge_movement_ended = false
 	_dodge_iframe_start = dive_iframe_start_norm if dive else dodge_iframe_start_norm
 	_dodge_iframe_end = dive_iframe_end_norm if dive else dodge_iframe_end_norm
 	var distance := dive_distance if dive else dodge_distance
@@ -317,6 +321,7 @@ func stop_combat() -> void:
 	_dodge_elapsed = 0.0
 	_dodge_duration = 0.0
 	_dodge_velocity = Vector3.ZERO
+	_dodge_movement_ended = false
 	_blocking = false
 	_hit_targets.clear()
 	clear_block_overlay()
@@ -375,12 +380,19 @@ func _update_attack(delta: float) -> void:
 func _update_dodge(delta: float) -> void:
 	var speed: float = _anim_player.speed_scale if _anim_player else 1.0
 	_dodge_elapsed += delta * speed
-	if _dodge_elapsed >= _dodge_duration * dodge_early_exit_norm:
+
+	# After early-exit point the player may queue new actions (attacks, blocks).
+	if not _dodge_movement_ended and _dodge_elapsed >= _dodge_duration * dodge_early_exit_norm:
+		_dodge_movement_ended = true
+
+	# Full clip finished: clean up and hand back to AnimationTree.
+	if _dodge_elapsed >= _dodge_duration:
 		_dodge_elapsed = 0.0
 		_dodge_duration = 0.0
 		_dodge_velocity = Vector3.ZERO
 		_dodge_iframe_start = 0.0
 		_dodge_iframe_end = 0.0
+		_dodge_movement_ended = false
 		_finish_action_lock()
 
 

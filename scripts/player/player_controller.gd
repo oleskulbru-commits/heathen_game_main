@@ -113,8 +113,7 @@ var _drawing_weapon: bool = false   # true = drawing, false = sheathing (while a
 var _seax_node: Node
 var _right_arm_indices: Array[int] = []
 var _right_arm_bone_names: Array[String] = []
-var _draw_sheath_os_layer := "ActionOneShot"
-var _draw_sheath_os_timer := 0.0
+var _draw_sheath_player: AnimationPlayer
 
 func get_health() -> float:
 	return _health
@@ -401,7 +400,6 @@ func _process(delta: float) -> void:
 		if _foot_ik and _foot_ik.has_method("clear_overrides"):
 			_foot_ik.clear_overrides()
 		return
-	_process_draw_sheath(delta)
 	_update_focus(delta)
 	if _foot_ik:
 		_foot_ik.update(delta)
@@ -475,23 +473,6 @@ func _apply_head_look(delta: float) -> void:
 	var t := clampf(head_track_speed * delta, 0.0, 1.0)
 	_head_look_current.y = lerp_angle(_head_look_current.y, w_yaw, t)
 	_head_look_current.x = lerp_angle(_head_look_current.x, w_pitch, t)
-
-func _set_anim_condition(condition: String, value: bool) -> void:
-	if anim_tree.get("parameters/StateMachine/conditions/" + condition) != null:
-		anim_tree.set("parameters/StateMachine/conditions/" + condition, value)
-	else:
-		anim_tree.set("parameters/conditions/" + condition, value)
-
-func _set_anim_param(param: String, value: Variant) -> void:
-	if anim_tree.get("parameters/StateMachine/" + param) != null:
-		anim_tree.set("parameters/StateMachine/" + param, value)
-	else:
-		anim_tree.set("parameters/" + param, value)
-
-func _get_playback() -> AnimationNodeStateMachinePlayback:
-	var playback = anim_tree.get("parameters/StateMachine/playback")
-	if playback: return playback as AnimationNodeStateMachinePlayback
-	return anim_tree.get("parameters/playback") as AnimationNodeStateMachinePlayback
 	# Step 1: Clear all overrides so we read the clean animated poses.
 	for entry in _look_chain:
 		_skeleton.set_bone_global_pose_override(entry.idx, Transform3D.IDENTITY, 0.0, true)
@@ -551,34 +532,34 @@ var _current_combat_blend: Vector2 = Vector2.ZERO
 func _update_animation(moving: bool, sprinting: bool, delta: float, move_dir: Vector3) -> void:
 	if _mode == PlayerMode.COMBAT:
 		# Clear traversal conditions so auto-transitions don't fight travel()
-		_set_anim_condition("is_moving", false)
-		_set_anim_condition("is_stopping", false)
+		anim_tree.set("parameters/conditions/is_moving", false)
+		anim_tree.set("parameters/conditions/is_stopping", false)
 		var is_blocking := _player_combat and _player_combat.has_method("is_blocking") and bool(_player_combat.is_blocking())
 		anim_player.speed_scale = (combat_speed_scale * 0.6) if is_blocking else combat_speed_scale
-		var playback := _get_playback()
+		var playback: AnimationNodeStateMachinePlayback = anim_tree["parameters/playback"]
 		var current_node := playback.get_current_node()
 		if current_node != &"Combat":
 			playback.travel("Combat")
 		var target_blend := _get_combat_strafe_blend(move_dir) if moving else Vector2.ZERO
 		_current_combat_blend = _current_combat_blend.move_toward(target_blend, blend_lerp_speed * delta)
-		_set_anim_param("Combat/blend_position", _current_combat_blend)
+		anim_tree.set("parameters/Combat/blend_position", _current_combat_blend)
 		_was_moving = moving
 		return
 
 	anim_player.speed_scale = 1.0
-	_set_anim_condition("is_moving", moving)
-	_set_anim_condition("is_stopping", _was_moving and not moving)
+	anim_tree.set("parameters/conditions/is_moving", moving)
+	anim_tree.set("parameters/conditions/is_stopping", _was_moving and not moving)
 
 	if _mode == PlayerMode.STEALTH:
 		var target := 1.0 if moving else 0.0
 		_current_crouch_blend = move_toward(_current_crouch_blend, target, blend_lerp_speed * delta)
-		_set_anim_param("CrouchLocomotion/blend_position", _current_crouch_blend)
+		anim_tree.set("parameters/CrouchLocomotion/blend_position", _current_crouch_blend)
 	else:
 		var target := 0.0
 		if moving:
 			target = 2.0 if sprinting else 1.0
 		_current_loco_blend = move_toward(_current_loco_blend, target, blend_lerp_speed * delta)
-		_set_anim_param("Locomotion/blend_position", _current_loco_blend)
+		anim_tree.set("parameters/Locomotion/blend_position", _current_loco_blend)
 
 	_was_moving = moving
 
@@ -598,11 +579,11 @@ func _set_mode(new_mode: PlayerMode) -> void:
 	if new_mode == _mode:
 		return
 	_mode = new_mode
-	var playback := _get_playback()
+	var playback: AnimationNodeStateMachinePlayback = anim_tree["parameters/playback"]
 	var current := playback.get_current_node()
 	if _mode == PlayerMode.COMBAT:
 		_current_combat_blend = Vector2.ZERO
-		_set_anim_param("Combat/blend_position", _current_combat_blend)
+		anim_tree.set("parameters/Combat/blend_position", _current_combat_blend)
 		playback.travel("Combat")
 	elif _mode == PlayerMode.STEALTH:
 		if current == &"Locomotion":
@@ -611,7 +592,7 @@ func _set_mode(new_mode: PlayerMode) -> void:
 			playback.travel("CrouchIdle")
 	else:
 		_current_combat_blend = Vector2.ZERO
-		_set_anim_param("Combat/blend_position", _current_combat_blend)
+		anim_tree.set("parameters/Combat/blend_position", _current_combat_blend)
 		var wants_move := Input.get_vector("move_left", "move_right", "move_forward", "move_back").length() > 0.1
 		if current == &"CrouchLocomotion":
 			playback.travel("Locomotion")
@@ -832,7 +813,7 @@ func _toggle_weapon() -> void:
 func _play_draw_weapon() -> void:
 	if _weapon_drawn or _draw_sheath_active:
 		return
-	if not anim_player or not anim_player.has_animation(draw_weapon_anim):
+	if not _draw_sheath_player or not _draw_sheath_player.has_animation(&"draw"):
 		_weapon_drawn = true
 		if _seax_node:
 			_seax_node.visible = true
@@ -841,7 +822,7 @@ func _play_draw_weapon() -> void:
 	_draw_sheath_active = true
 	if _seax_node:
 		_seax_node.visible = true
-	_play_action_clip(draw_weapon_anim)
+	_draw_sheath_player.play_with_capture(&"draw", 0.2)
 
 
 func _play_sheath_weapon() -> void:
@@ -849,37 +830,18 @@ func _play_sheath_weapon() -> void:
 		return
 	if _mode == PlayerMode.COMBAT:
 		return
-	if not anim_player or not anim_player.has_animation(sheath_weapon_anim):
+	if not _draw_sheath_player or not _draw_sheath_player.has_animation(&"sheath"):
+		push_warning("[Player] Missing filtered sheath animation")
 		_weapon_drawn = false
 		if _seax_node:
 			_seax_node.visible = false
 		return
 	_drawing_weapon = false
 	_draw_sheath_active = true
-	_play_action_clip(sheath_weapon_anim)
+	_draw_sheath_player.play_with_capture(&"sheath", 0.2)
 
 
-func _play_action_clip(anim_name: StringName) -> void:
-	if not anim_tree: return
-	var bt := anim_tree.tree_root as AnimationNodeBlendTree
-	if not bt: return
-	var anim_node := bt.get_node("ActionAnim") as AnimationNodeAnimation
-	if anim_node:
-		anim_node.animation = anim_name
-	
-	anim_tree.set("parameters/" + _draw_sheath_os_layer + "/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
-	var length := anim_player.get_animation(anim_name).length
-	_draw_sheath_os_timer = length
-
-
-func _process_draw_sheath(delta: float) -> void:
-	if _draw_sheath_active and _draw_sheath_os_timer > 0.0:
-		_draw_sheath_os_timer -= delta
-		if _draw_sheath_os_timer <= 0.0:
-			_on_draw_sheath_finished()
-
-
-func _on_draw_sheath_finished() -> void:
+func _on_draw_sheath_finished(_anim_name: StringName) -> void:
 	_draw_sheath_active = false
 	_weapon_drawn = _drawing_weapon
 	if not _weapon_drawn and _seax_node:
@@ -887,10 +849,9 @@ func _on_draw_sheath_finished() -> void:
 
 
 func _cancel_draw_sheath() -> void:
-	if anim_tree and anim_tree.tree_root is AnimationNodeBlendTree:
-		anim_tree.set("parameters/" + _draw_sheath_os_layer + "/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_ABORT)
+	if _draw_sheath_player:
+		_draw_sheath_player.stop()
 	_draw_sheath_active = false
-	_draw_sheath_os_timer = 0.0
 	if _drawing_weapon and _seax_node:
 		_seax_node.visible = false
 
@@ -925,34 +886,53 @@ func _collect_bone_descendants_sorted(parent_idx: int) -> Array[int]:
 
 
 func _init_draw_sheath_player() -> void:
-	if not anim_tree or not anim_tree.tree_root:
-		return
-	var base_node: AnimationNode = anim_tree.tree_root
-	var bt := AnimationNodeBlendTree.new()
-	bt.add_node("StateMachine", base_node)
-	
-	var os := AnimationNodeOneShot.new()
-	os.fadein_time = 0.25
-	os.fadeout_time = 0.25
-	os.filter_enabled = true
-	if _skeleton:
-		for bone_name in _right_arm_bone_names:
-			var path := NodePath(str(_skeleton.name) + ":" + bone_name)
-			os.set_filter_path(path, true)
-			
-	bt.add_node(_draw_sheath_os_layer, os)
-	
-	var anim_node := AnimationNodeAnimation.new()
-	bt.add_node("ActionAnim", anim_node)
-	
-	bt.connect_node(_draw_sheath_os_layer, 0, "StateMachine")
-	bt.connect_node(_draw_sheath_os_layer, 1, "ActionAnim")
-	bt.connect_node("output", 0, _draw_sheath_os_layer)
-	
-	anim_tree.tree_root = bt
+	_draw_sheath_player = AnimationPlayer.new()
+	_draw_sheath_player.name = "DrawSheathPlayer"
+	visual_root.add_child(_draw_sheath_player)
+	_draw_sheath_player.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_IDLE
+	_draw_sheath_player.animation_finished.connect(_on_draw_sheath_finished)
+	var lib := AnimationLibrary.new()
+	var draw_filtered := _create_arm_filtered_animation(draw_weapon_anim)
+	if draw_filtered:
+		lib.add_animation(&"draw", draw_filtered)
+	var sheath_filtered := _create_arm_filtered_animation(sheath_weapon_anim)
+	if sheath_filtered:
+		lib.add_animation(&"sheath", sheath_filtered)
+	_draw_sheath_player.add_animation_library(&"", lib)
 
 
-
+func _create_arm_filtered_animation(source_name: StringName) -> Animation:
+	if not anim_player.has_animation(source_name):
+		push_warning("[Player] Source animation '%s' not found for arm filter" % source_name)
+		return null
+	var source := anim_player.get_animation(source_name)
+	if not source:
+		return null
+	var filtered := Animation.new()
+	filtered.length = source.length
+	filtered.loop_mode = source.loop_mode
+	for t in source.get_track_count():
+		var path_str := str(source.track_get_path(t))
+		var colon := path_str.rfind(":")
+		if colon < 0:
+			continue
+		var bone_name := path_str.substr(colon + 1)
+		if bone_name not in _right_arm_bone_names:
+			continue
+		var idx := filtered.add_track(source.track_get_type(t))
+		filtered.track_set_path(idx, source.track_get_path(t))
+		filtered.track_set_interpolation_type(idx, source.track_get_interpolation_type(t))
+		for k in source.track_get_key_count(t):
+			filtered.track_insert_key(
+				idx,
+				source.track_get_key_time(t, k),
+				source.track_get_key_value(t, k),
+				source.track_get_key_transition(t, k)
+			)
+	if filtered.get_track_count() == 0:
+		push_warning("[Player] No right-arm tracks found in '%s' (arm bones: %s)" % [source_name, _right_arm_bone_names])
+		return null
+	return filtered
 
 func _face_combat_target(delta: float) -> void:
 	if not is_instance_valid(_combat_target):

@@ -9,8 +9,13 @@ signal suspicion_changed(value: float)
 signal entered_combat()
 signal player_lost_in_darkness(last_known_pos: Vector3)
 signal heard_noise(source_pos: Vector3)
+signal emotional_state_changed(new_state: int)
+@warning_ignore("unused_signal")
+signal call_for_help(caller: CharacterBody3D, caller_pos: Vector3)
 
 const StealthGridScript := preload("res://scripts/enemies/stealth_nav_grid.gd")
+
+enum Emotion { NORMAL, TERRIFIED, ENRAGED }
 
 @export var threshold_curious: float = 0.3
 @export var threshold_alert: float = 0.6
@@ -22,10 +27,15 @@ const StealthGridScript := preload("res://scripts/enemies/stealth_nav_grid.gd")
 @export var heightened_sight_mult: float = 1.3
 @export var heightened_fov_bonus: float = 20.0
 @export var deescalate_time: float = 4.0
+@export_group("Emotional State")
+@export var terror_duration: float = 6.0
+@export var enrage_duration: float = 30.0
 
 var alert_level: int = 0
 var suspicion: float = 0.0
 var last_known_positions: Array[Vector3] = []
+var emotion: Emotion = Emotion.NORMAL
+var is_dead: bool = false
 
 var _bandit: CharacterBody3D
 var _torch_search: Node
@@ -41,6 +51,7 @@ var _stealth_waypoints: PackedVector3Array = PackedVector3Array()
 var _stealth_wp_index: int = 0
 var _stealth_target: Vector3 = Vector3.INF
 var _stealth_age: float = 0.0
+var _emotion_timer: float = 0.0
 
 const _STEALTH_WP_ARRIVE := 2.5
 const _STEALTH_REBUILD_TIME := 10.0
@@ -58,6 +69,11 @@ func _physics_process(delta: float) -> void:
 
 	if _heightened_timer > 0.0:
 		_heightened_timer = maxf(_heightened_timer - delta, 0.0)
+
+	if _emotion_timer > 0.0:
+		_emotion_timer = maxf(_emotion_timer - delta, 0.0)
+		if _emotion_timer <= 0.0:
+			_set_emotion(Emotion.NORMAL)
 
 	if _torch_search and _torch_search.has_method("is_searching") and _torch_search.is_searching():
 		return
@@ -242,6 +258,42 @@ func reset_alert() -> void:
 	_clear_stealth_path()
 	alert_level_changed.emit(0)
 	suspicion_changed.emit(0.0)
+
+
+# --- Emotional state ---
+
+func apply_terror(duration_override: float = -1.0) -> void:
+	var dur := duration_override if duration_override > 0.0 else terror_duration
+	_set_emotion(Emotion.TERRIFIED)
+	_emotion_timer = dur
+
+
+func apply_enrage(duration_override: float = -1.0) -> void:
+	var dur := duration_override if duration_override > 0.0 else enrage_duration
+	_set_emotion(Emotion.ENRAGED)
+	_emotion_timer = dur
+	if alert_level < 3:
+		force_combat(_player_position if _player_position != Vector3.INF else _bandit.global_position)
+
+
+func clear_emotion() -> void:
+	_set_emotion(Emotion.NORMAL)
+	_emotion_timer = 0.0
+
+
+func is_terrified() -> bool:
+	return emotion == Emotion.TERRIFIED
+
+
+func is_enraged() -> bool:
+	return emotion == Emotion.ENRAGED
+
+
+func _set_emotion(new_emotion: Emotion) -> void:
+	if emotion == new_emotion:
+		return
+	emotion = new_emotion
+	emotional_state_changed.emit(int(new_emotion))
 
 
 func _start_heightened_awareness() -> void:

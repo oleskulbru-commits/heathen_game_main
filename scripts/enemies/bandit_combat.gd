@@ -51,6 +51,9 @@ enum AttackKind { NONE, LIGHT, HEAVY, KICK }
 @export_group("Hit Detection")
 @export var target_collision_mask: int = 1
 
+@export_group("Help Call")
+@export var help_call_delay: float = 5.0
+
 var _bandit: CharacterBody3D
 var _brain: Node
 var _player: CharacterBody3D
@@ -67,6 +70,8 @@ var _cooldown_remaining: float = 0.0
 var _react_lock_remaining: float = 0.0
 var _hit_targets: Array[Node] = []
 var _disabled: bool = false
+var _help_call_timer: float = 0.0
+var _help_called: bool = false
 
 
 func _ready() -> void:
@@ -99,6 +104,14 @@ func _physics_process(delta: float) -> void:
 		if _current_attack != AttackKind.NONE:
 			_finish_attack()
 		return
+
+	# Help-call timer: accumulates while in combat, fires once.
+	if _brain.alert_level >= 3 and not _help_called:
+		_help_call_timer += delta
+		if _help_call_timer >= help_call_delay:
+			_help_called = true
+			if _brain.has_signal("call_for_help"):
+				_brain.call_for_help.emit(_bandit, _bandit.global_position)
 
 	if _cooldown_remaining > 0.0:
 		_cooldown_remaining = maxf(_cooldown_remaining - delta, 0.0)
@@ -142,6 +155,7 @@ func is_busy() -> bool:
 func receive_hit(from_world_pos: Vector3 = Vector3.INF) -> void:
 	if _disabled or (_bandit.has_method("is_dead") and bool(_bandit.is_dead())):
 		return
+	_help_call_timer = 0.0  # Reset: being pressured suppresses calling for help.
 	if not _anim_player:
 		return
 	if _current_attack != AttackKind.NONE:
@@ -311,6 +325,8 @@ func stop_combat() -> void:
 	_attack_duration = 0.0
 	_cooldown_remaining = 0.0
 	_hit_targets.clear()
+	_help_call_timer = 0.0
+	_help_called = false
 	_finish_action_lock()
 	set_physics_process(false)
 
