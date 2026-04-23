@@ -13,7 +13,7 @@ signal died()
 @export var chase_stop_distance: float = 1.6
 @export var chase_resume_distance: float = 2.2
 @export var chase_walk_distance: float = 3.0
-@export var chase_jog_distance: float = 7.0
+@export var chase_jog_distance: float = 3.5
 @export var chase_run_distance: float = 14.0
 
 ## Maximum distance the bandit is allowed to travel from his spawn point.
@@ -21,14 +21,7 @@ signal died()
 @export_group("Vitals")
 @export var max_health: float = 65.0
 @export_group("Death")
-@export var death_from_front_anim: StringName = &"PlayerDeaths/standing_death_backward_01"
-@export var death_from_back_anim: StringName = &"PlayerDeaths/standing_death_forward_01"
-@export var death_from_left_anim: StringName = &"PlayerDeaths/standing_death_left_01"
-@export var death_from_right_anim: StringName = &"PlayerDeaths/standing_death_right_01"
-
-# Turn-in-place state
-var _turning: bool = false
-var _turn_dir: int = 0  # -1 = left, +1 = right
+@export var death_anims: DeathAnimationSet
 
 # Idle variety
 var _idle_variant_timer: float = 0.0
@@ -40,9 +33,11 @@ var _is_dead: bool = false
 var _health_bar: Node3D
 var _current_combat_blend: Vector2 = Vector2.ZERO
 var _in_combat_tree: bool = false
+var _fsm: BanditStateMachine
 
 
 func _on_controller_ready() -> void:
+	_init_default_death_anims()
 	_health = max_health
 	if not is_in_group("bandit"):
 		add_to_group("bandit")
@@ -52,6 +47,18 @@ func _on_controller_ready() -> void:
 		_brain.heard_noise.connect(look_toward)
 	if _brain and _brain.has_signal("alert_level_changed"):
 		_brain.alert_level_changed.connect(_on_alert_level_changed)
+	# Spawn the FSM
+	_fsm = BanditStateMachine.new()
+	_fsm.name = "BanditFSM"
+	add_child(_fsm)
+	# Wire brain signals to FSM
+	if _brain:
+		if _brain.has_signal("entered_combat"):
+			_brain.entered_combat.connect(_on_brain_entered_combat)
+		if _brain.has_signal("heard_noise"):
+			_brain.heard_noise.connect(_on_brain_heard_noise)
+		if _brain.has_signal("alert_level_changed"):
+			_brain.alert_level_changed.connect(_on_brain_alert_changed)
 	_spawn_health_bar()
 	_spawn_heart_indicator()
 	health_changed.emit(_health, max_health)
@@ -147,6 +154,30 @@ func _on_alert_level_changed(level: int) -> void:
 		3: _target_speed = speed_combat
 
 
+# ── Brain → FSM signal bridges ──────────────────────────────────────────────
+
+func _on_brain_entered_combat() -> void:
+	if _fsm:
+		_fsm.on_player_spotted()
+
+
+func _on_brain_heard_noise(source_pos: Vector3) -> void:
+	if _fsm:
+		_fsm.on_noise_heard(source_pos)
+
+
+func _on_brain_alert_changed(level: int) -> void:
+	if not _fsm:
+		return
+	# Sync FSM with brain alert level changes
+	if level >= 3:
+		_fsm.on_player_spotted()
+	elif level == 0:
+		# Only return to patrol if we're in investigate/curious
+		if _fsm.current_state_name in [&"investigate", &"curious"]:
+			_fsm.change_state(&"patrol")
+
+
 func get_health() -> float:
 	return _health
 
@@ -155,7 +186,24 @@ func is_dead() -> bool:
 	return _is_dead
 
 
+func get_fsm() -> BanditStateMachine:
+	return _fsm
+
+
+func get_weapon_component():
+	var combat := get_node_or_null("BanditCombat")
+	if combat and combat.has_method("get_weapon_component"):
+		return combat.get_weapon_component()
+	return null
+
+
+func has_weapon() -> bool:
+	var weapon = get_weapon_component()
+	return weapon != null and bool(weapon.get("has_weapon"))
+
+
 func take_damage(amount: float, from_world_pos: Vector3 = Vector3.INF) -> void:
+	## Legacy flat-damage path (environmental, fall damage, etc.)
 	if _is_dead or amount <= 0.0:
 		return
 	_health = clampf(_health - amount, 0.0, max_health)
@@ -171,6 +219,105 @@ func take_damage(amount: float, from_world_pos: Vector3 = Vector3.INF) -> void:
 	var combat := get_node_or_null("BanditCombat")
 	if combat and combat.has_method("receive_hit"):
 		combat.receive_hit(from_world_pos)
+
+
+func take_combat_damage(amount: float, from_world_pos: Vector3, attack_kind: String) -> Dictionary:
+	## Player melee hit — routes through the FSM vulnerability system.
+	## Returns { "deflected": bool } so the player can react.
+	var result := { "deflected": false }
+	if _is_dead or amount <= 0.0:
+		return result
+
+	var combat := get_node_or_null("BanditCombat")
+
+	# ── Fatally wounded: any hit = mercy kill ────────────────────────────
+	if _fsm and _fsm.current_state_name == &"fatally_wounded":
+		if _fsm.has_method("on_silenced"):
+			_fsm.on_silenced()
+		return result
+
+	# ── Blocking check (before vulnerability gate) ──────────────────────
+	if combat and combat.has_method("is_blocking") and combat.is_blocking():
+		if attack_kind == "heavy" and combat.has_method("on_block_heavy_hit"):
+			combat.on_block_heavy_hit()
+		elif combat.has_method("on_block_light_hit"):
+			combat.on_block_light_hit()
+		result["blocked"] = true
+		return result
+
+	# ── Poise check — heavy wind-up absorbs light hits ──────────────────
+	if attack_kind == "light" and combat and combat.has_method("has_poise") and combat.has_poise():
+		return result
+
+	# ── Heavy attack (Committed Thrust) routing ─────────────────────────
+	if attack_kind == "heavy":
+		if _fsm and _fsm.current_state_name in [&"deep_stagger", &"micro_stagger"]:
+			# 2nd thrust on staggered enemy → fatal blow
+			_fsm.change_state(&"fatally_wounded")
+			_update_health_bar()
+			return result
+		if _fsm and _fsm.is_vulnerable():
+			# 1st thrust on vulnerable enemy → deep stagger (applies 50% max HP internally)
+			_fsm.change_state(&"deep_stagger")
+			_update_health_bar()
+			return result
+		# Not vulnerable → deflected
+		result["deflected"] = true
+		_ensure_combat_from_hit(from_world_pos)
+		return result
+
+	# ── Light attack routing ────────────────────────────────────────────
+	if attack_kind == "light":
+		if _fsm and _fsm.current_state_name in [&"deep_stagger", &"micro_stagger"]:
+			# Light on staggered → micro_stagger (resets timer, keeps combo alive)
+			_fsm.change_state(&"micro_stagger")
+			_apply_light_damage(amount)
+			if combat and combat.has_method("register_light_hit_received"):
+				combat.register_light_hit_received()
+			return result
+		if _fsm and _fsm.is_vulnerable():
+			# Light on other vulnerable state → micro_stagger + damage
+			_fsm.change_state(&"micro_stagger")
+			_apply_light_damage(amount)
+			return result
+		# Not vulnerable → deflected
+		result["deflected"] = true
+		_ensure_combat_from_hit(from_world_pos)
+		return result
+
+	# ── Kick routing ────────────────────────────────────────────────────
+	if attack_kind == "kick":
+		# Kicks always connect — apply damage and knockback
+		_apply_light_damage(amount)
+		_ensure_combat_from_hit(from_world_pos)
+		if combat and combat.has_method("receive_hit"):
+			combat.receive_hit(from_world_pos)
+		return result
+
+	# ── Fallback ────────────────────────────────────────────────────────
+	if _fsm and not _fsm.is_vulnerable():
+		result["deflected"] = true
+		_ensure_combat_from_hit(from_world_pos)
+		return result
+	_apply_light_damage(amount)
+	return result
+
+
+func _apply_light_damage(amount: float) -> void:
+	_health = clampf(_health - amount, 0.0, max_health)
+	health_changed.emit(_health, max_health)
+	_update_health_bar()
+
+
+func _update_health_bar() -> void:
+	if _health_bar:
+		_health_bar.call("set_health_ratio", _health / maxf(max_health, 0.001))
+		_health_bar.call("show_temporarily", 2.0)
+
+
+func _ensure_combat_from_hit(from_world_pos: Vector3) -> void:
+	if _brain and from_world_pos != Vector3.INF and _brain.has_method("force_combat"):
+		_brain.force_combat(from_world_pos)
 
 
 func _die(from_world_pos: Vector3 = Vector3.INF) -> void:
@@ -203,17 +350,26 @@ func _die(from_world_pos: Vector3 = Vector3.INF) -> void:
 	died.emit()
 
 
+func _init_default_death_anims() -> void:
+	if not death_anims:
+		death_anims = DeathAnimationSet.new()
+		death_anims.from_front = &"PlayerDeaths/standing_death_backward_01"
+		death_anims.from_back = &"PlayerDeaths/standing_death_forward_01"
+		death_anims.from_left = &"PlayerDeaths/standing_death_left_01"
+		death_anims.from_right = &"PlayerDeaths/standing_death_right_01"
+
+
 func _resolve_death_animation(from_world_pos: Vector3) -> StringName:
-	if from_world_pos == Vector3.INF:
-		var defaults: Array[StringName] = [death_from_front_anim, death_from_back_anim, death_from_left_anim, death_from_right_anim]
-		for candidate in defaults:
-			if anim_player and anim_player.has_animation(candidate):
-				return candidate
-		return death_from_front_anim
-	var local := to_local(from_world_pos)
-	if absf(local.x) > absf(local.z):
-		return death_from_right_anim if local.x >= 0.0 else death_from_left_anim
-	return death_from_front_anim if local.z < 0.0 else death_from_back_anim
+	var local := to_local(from_world_pos) if from_world_pos != Vector3.INF else Vector3.INF
+	var raw := death_anims.resolve(local)
+	var resolved := AnimationResolver.resolve(raw, anim_player)
+	if anim_player and anim_player.has_animation(resolved):
+		return resolved
+	for candidate in [death_anims.from_front, death_anims.from_back, death_anims.from_left, death_anims.from_right]:
+		var alt := AnimationResolver.resolve(candidate, anim_player)
+		if anim_player and anim_player.has_animation(alt):
+			return alt
+	return resolved
 
 
 func _spawn_health_bar() -> void:
@@ -238,7 +394,11 @@ func _spawn_health_bar() -> void:
 
 
 func _update_animation_state(is_moving: bool, delta: float) -> void:
-	if is_moving and anim_tree and not anim_tree.active and not _turning:
+	if _current_alert >= 3 and _is_unarmed_combatant():
+		_play_unarmed_combat_animation(is_moving)
+		_was_moving = is_moving
+		return
+	if is_moving and anim_tree and not anim_tree.active:
 		anim_tree.active = true
 
 	if not is_moving:
@@ -250,45 +410,12 @@ func _update_animation_state(is_moving: bool, delta: float) -> void:
 			if _idle_variant_timer <= 0.0:
 				_play_alert_idle()
 				_idle_variant_timer = randf_range(8.0, 15.0)
-	elif anim_player and anim_player.is_playing() and not _turning:
+	elif anim_player and anim_player.is_playing():
 		anim_player.stop()
-
-	if is_moving:
-		var desired2d := _get_desired_move_direction()
-		var face2d := Vector2(visual_root.global_transform.basis.z.x,
-							  visual_root.global_transform.basis.z.z)
-		if desired2d.length() > 0.05 and face2d.length() > 0.05:
-			var angle_err := face2d.angle_to(desired2d.normalized())
-			if _turning:
-				if abs(angle_err) > deg_to_rad(8.0) and move_speed < speed_alert:
-					_was_moving = is_moving
-					return
-				_turning = false
-				if anim_player:
-					anim_player.stop()
-			elif abs(angle_err) > deg_to_rad(40.0) and move_speed < speed_alert:
-				if not _turning:
-					_turning = true
-					_turn_dir = 1 if angle_err > 0.0 else -1
-					var turn_anim := "npc_male_locomotion/right_turn" if _turn_dir > 0 else "npc_male_locomotion/left_turn"
-					if anim_player and anim_player.has_animation(turn_anim):
-						if anim_tree:
-							anim_tree.active = false
-						anim_player.play(turn_anim, 0.15)
-				_was_moving = is_moving
-				return
-		elif _turning:
-			_turning = false
-			if anim_player:
-				anim_player.stop()
-	elif _turning:
-		_turning = false
-		if anim_player:
-			anim_player.stop()
 
 	# ── Combat mode: use Combat BlendSpace2D ────────────────────────────
 	if _current_alert >= 3:
-		anim_player.speed_scale = combat_speed_scale
+		anim_player.speed_scale = _get_combat_playback_scale(is_moving)
 		_set_anim_condition("is_moving", false)
 		_set_anim_condition("is_stopping", false)
 		var playback: AnimationNodeStateMachinePlayback = _get_anim_playback()
@@ -320,7 +447,7 @@ func _update_animation_state(is_moving: bool, delta: float) -> void:
 
 
 func _should_block_horizontal_motion() -> bool:
-	return _turning
+	return false
 
 
 func _should_force_idle() -> bool:
@@ -349,8 +476,10 @@ func _get_combat_strafe_blend() -> Vector2:
 	# Snap to cardinal direction (no diagonals)
 	if abs(raw.x) >= abs(raw.y):
 		return Vector2(signf(raw.x), 0.0)
-	else:
-		return Vector2(0.0, signf(raw.y))
+	var vertical := signf(raw.y)
+	if vertical <= 0.0:
+		return Vector2(0.0, vertical)
+	return Vector2(0.0, _get_forward_chase_blend())
 
 
 func refresh_idle_animation() -> void:
@@ -370,10 +499,36 @@ func _get_desired_move_direction() -> Vector2:
 	return Vector2.ZERO
 
 
+func _get_combat_playback_scale(is_moving: bool) -> float:
+	if not is_moving:
+		return 1.0
+	var chase_t := _get_forward_chase_t()
+	return lerpf(1.0, 1.15, chase_t)
+
+
+func _get_action_playback_scale() -> float:
+	var combat := get_node_or_null("BanditCombat")
+	if combat and combat.has_method("get_action_animation_speed_scale"):
+		return float(combat.get_action_animation_speed_scale())
+	return 1.0
+
+
+func _get_forward_chase_blend() -> float:
+	return lerpf(1.0, 2.0, _get_forward_chase_t())
+
+
+func _get_forward_chase_t() -> float:
+	var speed_span := maxf(speed_combat - speed_alert, 0.001)
+	return clampf((_target_speed - speed_alert) / speed_span, 0.0, 1.0)
+
+
 func _play_alert_idle() -> void:
 	if not anim_player:
 		return
 	if _is_dead:
+		return
+	if _current_alert >= 3 and _is_unarmed_combatant():
+		_play_unarmed_combat_animation(false)
 		return
 	# Combat idle: use the animation tree's Combat state at blend (0,0)
 	if _current_alert >= 3:
@@ -405,7 +560,33 @@ func _play_alert_idle() -> void:
 		anim_player.play(anim_name, 0.3)
 
 
-const _HEART_SHADER := preload("res://assets/shaders/heart_icon.gdshader")
+func _is_unarmed_combatant() -> bool:
+	var combat := get_node_or_null("BanditCombat")
+	return combat and combat.has_method("is_unarmed") and bool(combat.is_unarmed())
+
+
+func _play_unarmed_combat_animation(is_moving: bool) -> void:
+	if anim_tree:
+		anim_tree.active = false
+	_in_combat_tree = false
+	if not anim_player:
+		return
+	var anim_name := "npc_axe/unarmed_idle"
+	if is_moving:
+		var desired := _get_desired_move_direction()
+		var move_dot := 1.0
+		if desired.length_squared() > 0.0001 and visual_root:
+			var forward := Vector2(visual_root.global_transform.basis.z.x, visual_root.global_transform.basis.z.z)
+			if forward.length_squared() > 0.0001:
+				move_dot = forward.normalized().dot(desired.normalized())
+		var running := _target_speed >= speed_combat * 0.8
+		if move_dot < -0.2:
+			anim_name = "npc_axe/unarmed_run_back" if running else "npc_axe/unarmed_walk_back"
+		else:
+			anim_name = "npc_axe/unarmed_run_forward" if running else "npc_axe/unarmed_walk_forward"
+	if anim_player.current_animation != anim_name or not anim_player.is_playing():
+		if anim_player.has_animation(anim_name):
+			anim_player.play(anim_name, 0.12)
 const _HEART_SCRIPT := preload("res://scripts/enemies/heart_indicator.gd")
 
 
@@ -438,10 +619,15 @@ func _spawn_heart_indicator() -> void:
 	var quad := QuadMesh.new()
 	quad.size = Vector2(0.6, 0.6)
 
-	var mat := ShaderMaterial.new()
-	mat.shader = _HEART_SHADER
-	mat.set_shader_parameter("heart_color", Color(0.85, 0.12, 0.1, 1.0))
-	mat.set_shader_parameter("alpha_mult", 1.0)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	mat.no_depth_test = true
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.albedo_color = Color(0.85, 0.12, 0.1, 1.0)
+	mat.emission_enabled = true
+	mat.emission = Color(0.85, 0.12, 0.1, 1.0)
 
 	var mesh_inst := MeshInstance3D.new()
 	mesh_inst.mesh = quad

@@ -1,0 +1,54 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/spells/raven.gd" id="1_raven"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_body"]
+albedo_color = Color(0.08, 0.05, 0.12, 1)
+roughness = 0.9
+emission_enabled = true
+emission = Color(0.2, 0.08, 0.35, 1)
+emission_energy_multiplier = 0.4
+
+[sub_resource type="BoxMesh" id="BoxMesh_body"]
+material = SubResource("StandardMaterial3D_body")
+size = Vector3(0.15, 0.1, 0.35)
+
+[sub_resource type="BoxMesh" id="BoxMesh_wing"]
+material = SubResource("StandardMaterial3D_body")
+size = Vector3(0.35, 0.02, 0.2)
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_trail"]
+direction = Vector3(0, 0.2, -1)
+spread = 15.0
+initial_velocity_min = 0.5
+initial_velocity_max = 1.5
+gravity = Vector3(0, -0.3, 0)
+damping_min = 2.0
+damping_max = 4.0
+scale_min = 0.02
+scale_max = 0.05
+color = Color(0.3, 0.12, 0.5, 0.6)
+
+[sub_resource type="QuadMesh" id="QuadMesh_particle"]
+size = Vector2(0.04, 0.04)
+
+[node name="Raven" type="Node3D"]
+script = ExtResource("1_raven")
+
+[node name="Body" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_body")
+
+[node name="LeftWing" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.18, 0.02, 0)
+mesh = SubResource("BoxMesh_wing")
+
+[node name="RightWing" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.18, 0.02, 0)
+mesh = SubResource("BoxMesh_wing")
+
+[node name="Trail" type="GPUParticles3D" parent="."]
+amount = 16
+lifetime = 0.5
+process_material = SubResource("ParticleProcessMaterial_trail")
+draw_pass_1 = SubResource("QuadMesh_particle")
+emitting = false

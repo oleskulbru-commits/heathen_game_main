@@ -256,7 +256,7 @@ func _has_line_of_sight(from_position: Vector3, to_position: Vector3) -> bool:
 	return false
 
 
-func _set_awareness_state(next_state: int) -> void:
+func _set_awareness_state(next_state: AwarenessState) -> void:
 	if awareness_state == next_state:
 		_update_awareness_visuals()
 		return

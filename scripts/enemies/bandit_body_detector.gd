@@ -51,7 +51,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _is_downed(node: Node) -> bool:
-	if node.has_method("is_dead") and node.is_dead():
+	if node is ICombatTarget and node.is_dead():
 		return true
 	if "is_dead" in node and node.is_dead:
 		return true

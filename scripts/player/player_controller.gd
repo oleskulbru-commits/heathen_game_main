@@ -1,4 +1,4 @@
-extends CharacterBody3D
+extends "res://scripts/common/icombat_target.gd"
 ## Player controller built around root-motion locomotion with Witcher 3-style
 ## orbit camera.  The camera orbits freely around the player via mouse; WASD
 ## movement is relative to the camera.  The visual mesh rotates to face the
@@ -29,9 +29,10 @@ extends CharacterBody3D
 @export var lock_on_yaw_speed: float = 3.0   ## How fast yaw tracks the target (rad/s)
 @export var lock_on_pitch_speed: float = 1.5 ## How fast pitch nudges toward target
 @export var lock_on_pitch_offset: float = -0.12 ## Slight downward bias so camera looks at chest
-@export var combat_shoulder_offset: float = 0.9 ## X offset during combat (over-the-shoulder)
+@export var traversal_shoulder_offset: float = 0.0 ## Centered camera offset outside combat
+@export var combat_shoulder_offset: float = 0.9 ## X offset during combat (pushes player to left third)
 @export var shoulder_lerp_speed: float = 4.0  ## How fast the offset transitions
-@export var combat_yaw_bias: float = -0.1    ## Yaw offset to push enemy to right third of screen (rad)
+@export var combat_yaw_bias: float = 0.18     ## Yaw offset to push enemy to right third (rad)
 @export_group("Handheld Shake")
 @export var shake_intensity: float = 0.015 ## Max rotation offset in radians (~0.86 deg)
 @export var shake_speed: float = 0.00125     ## How fast the noise scrolls
@@ -43,7 +44,6 @@ extends CharacterBody3D
 @export_group("Weapon Draw / Sheath")
 @export var draw_weapon_anim: StringName = &"npc_sword_shield/draw_sword_2"
 @export var sheath_weapon_anim: StringName = &"npc_sword_shield/sheath_sword_1"
-
 # ── Node references ──────────────────────────────────────────────────────────
 @onready var camera_pivot: Node3D = $CameraPivot
 @onready var _spring_arm: SpringArm3D = $CameraPivot/SpringArm3D
@@ -107,6 +107,7 @@ var is_sprinting: bool = false
 var is_moving: bool = false
 var _is_dead: bool = false
 var _action_locked: bool = false
+var _external_locomotion_modifier: float = 1.0
 var _weapon_drawn: bool = false
 var _draw_sheath_active: bool = false
 var _drawing_weapon: bool = false   # true = drawing, false = sheathing (while anim plays)
@@ -120,6 +121,13 @@ func get_health() -> float:
 
 func get_stamina() -> float:
 	return _stamina
+
+
+func drain_stamina(amount: float) -> void:
+	if _is_dead or amount <= 0.0:
+		return
+	_stamina = clampf(_stamina - amount, 0.0, max_stamina)
+	stamina_changed.emit(_stamina, max_stamina)
 
 func is_dead() -> bool:
 	return _is_dead
@@ -200,7 +208,8 @@ func _ready() -> void:
 	# Focus mode defaults
 	_default_fov = _camera.fov
 	_default_arm_length = _spring_arm.spring_length
-	_default_shoulder_x = _spring_arm.position.x
+	_default_shoulder_x = traversal_shoulder_offset
+	_spring_arm.position.x = _default_shoulder_x
 	# Heartbeat audio
 	_heartbeat_player = AudioStreamPlayer.new()
 	_heartbeat_player.bus = &"Master"
@@ -270,20 +279,24 @@ func _physics_process(delta: float) -> void:
 	_sync_block_state()
 	if _action_locked:
 		_clear_head_look_overrides()
-		if _foot_ik and _foot_ik.has_method("clear_overrides"):
-			_foot_ik.clear_overrides()
-		anim_player.speed_scale = combat_speed_scale
+		anim_player.speed_scale = _get_locked_action_speed_scale()
 		# Keep facing the combat target even while action-locked (blocking, etc.)
 		if _mode == PlayerMode.COMBAT and is_instance_valid(_combat_target):
 			_face_combat_target(delta)
+		# Buffer inputs during action lock so queued actions fire on release
+		_buffer_inputs_while_locked(delta, input, move_dir)
 		if not is_on_floor():
 			velocity += get_gravity() * gravity_scale * delta
 		var locked_motion := _get_action_root_motion_velocity(delta)
+		if _player_combat and _player_combat.has_method("get_locked_horizontal_velocity"):
+			var combat_locked_motion: Vector3 = _player_combat.get_locked_horizontal_velocity()
+			if combat_locked_motion.length_squared() > 0.0000001:
+				locked_motion = combat_locked_motion
 		velocity.x = locked_motion.x
 		velocity.z = locked_motion.z
 		move_and_slide()
 		return
-	if move_dir.length_squared() > 0.0001 and _player_combat and _player_combat.has_method("request_dodge"):
+	if _player_combat and _player_combat.has_method("request_dodge"):
 		if Input.is_action_just_pressed("dodge_modifier"):
 			if _player_combat.request_dodge(move_dir, input, false):
 				if not is_on_floor():
@@ -397,8 +410,8 @@ func _process(delta: float) -> void:
 		_cancel_draw_sheath()
 	if _action_locked:
 		_clear_head_look_overrides()
-		if _foot_ik and _foot_ik.has_method("clear_overrides"):
-			_foot_ik.clear_overrides()
+		if _foot_ik and _foot_ik.has_method("update"):
+			_foot_ik.update(delta)
 		return
 	_update_focus(delta)
 	if _foot_ik:
@@ -422,14 +435,30 @@ func _clear_head_look_overrides() -> void:
 
 
 func _get_action_root_motion_velocity(delta: float) -> Vector3:
-	if delta <= 0.0 or not anim_player:
+	if delta <= 0.0:
 		return Vector3.ZERO
-	var root_motion: Vector3 = anim_player.get_root_motion_position()
+	var root_motion := Vector3.ZERO
+	if anim_tree:
+		root_motion = anim_tree.get_root_motion_position()
+	if root_motion.length_squared() <= 0.0000001 and anim_player:
+		root_motion = anim_player.get_root_motion_position()
 	if root_motion.length_squared() <= 0.0000001:
 		return Vector3.ZERO
 	var root_basis := visual_root.global_transform.basis if visual_root else global_transform.basis
 	var root_world := root_basis * root_motion
 	return Vector3(root_world.x / delta, 0.0, root_world.z / delta)
+
+
+func _get_combat_action_speed_scale() -> float:
+	if _player_combat and _player_combat.has_method("get_action_animation_speed_scale"):
+		return float(_player_combat.get_action_animation_speed_scale())
+	return combat_speed_scale
+
+
+func _get_locked_action_speed_scale() -> float:
+	if _player_combat and _player_combat.has_method("get_locked_animation_speed_scale"):
+		return float(_player_combat.get_locked_animation_speed_scale())
+	return _get_combat_action_speed_scale()
 
 func _apply_head_look(delta: float) -> void:
 	if _look_chain.is_empty():
@@ -532,34 +561,34 @@ var _current_combat_blend: Vector2 = Vector2.ZERO
 func _update_animation(moving: bool, sprinting: bool, delta: float, move_dir: Vector3) -> void:
 	if _mode == PlayerMode.COMBAT:
 		# Clear traversal conditions so auto-transitions don't fight travel()
-		anim_tree.set("parameters/conditions/is_moving", false)
-		anim_tree.set("parameters/conditions/is_stopping", false)
+		anim_tree.set("parameters/StateMachine/conditions/is_moving", false)
+		anim_tree.set("parameters/StateMachine/conditions/is_stopping", false)
 		var is_blocking := _player_combat and _player_combat.has_method("is_blocking") and bool(_player_combat.is_blocking())
-		anim_player.speed_scale = (combat_speed_scale * 0.6) if is_blocking else combat_speed_scale
-		var playback: AnimationNodeStateMachinePlayback = anim_tree["parameters/playback"]
+		anim_player.speed_scale = _get_combat_action_speed_scale() if is_blocking else combat_speed_scale
+		var playback: AnimationNodeStateMachinePlayback = anim_tree["parameters/StateMachine/playback"]
 		var current_node := playback.get_current_node()
 		if current_node != &"Combat":
 			playback.travel("Combat")
 		var target_blend := _get_combat_strafe_blend(move_dir) if moving else Vector2.ZERO
 		_current_combat_blend = _current_combat_blend.move_toward(target_blend, blend_lerp_speed * delta)
-		anim_tree.set("parameters/Combat/blend_position", _current_combat_blend)
+		anim_tree.set("parameters/StateMachine/Combat/blend_position", _current_combat_blend)
 		_was_moving = moving
 		return
 
 	anim_player.speed_scale = 1.0
-	anim_tree.set("parameters/conditions/is_moving", moving)
-	anim_tree.set("parameters/conditions/is_stopping", _was_moving and not moving)
+	anim_tree.set("parameters/StateMachine/conditions/is_moving", moving)
+	anim_tree.set("parameters/StateMachine/conditions/is_stopping", _was_moving and not moving)
 
 	if _mode == PlayerMode.STEALTH:
 		var target := 1.0 if moving else 0.0
 		_current_crouch_blend = move_toward(_current_crouch_blend, target, blend_lerp_speed * delta)
-		anim_tree.set("parameters/CrouchLocomotion/blend_position", _current_crouch_blend)
+		anim_tree.set("parameters/StateMachine/CrouchLocomotion/blend_position", _current_crouch_blend)
 	else:
 		var target := 0.0
 		if moving:
 			target = 2.0 if sprinting else 1.0
 		_current_loco_blend = move_toward(_current_loco_blend, target, blend_lerp_speed * delta)
-		anim_tree.set("parameters/Locomotion/blend_position", _current_loco_blend)
+		anim_tree.set("parameters/StateMachine/Locomotion/blend_position", _current_loco_blend)
 
 	_was_moving = moving
 
@@ -579,11 +608,11 @@ func _set_mode(new_mode: PlayerMode) -> void:
 	if new_mode == _mode:
 		return
 	_mode = new_mode
-	var playback: AnimationNodeStateMachinePlayback = anim_tree["parameters/playback"]
+	var playback: AnimationNodeStateMachinePlayback = anim_tree["parameters/StateMachine/playback"]
 	var current := playback.get_current_node()
 	if _mode == PlayerMode.COMBAT:
 		_current_combat_blend = Vector2.ZERO
-		anim_tree.set("parameters/Combat/blend_position", _current_combat_blend)
+		anim_tree.set("parameters/StateMachine/Combat/blend_position", _current_combat_blend)
 		playback.travel("Combat")
 	elif _mode == PlayerMode.STEALTH:
 		if current == &"Locomotion":
@@ -592,7 +621,7 @@ func _set_mode(new_mode: PlayerMode) -> void:
 			playback.travel("CrouchIdle")
 	else:
 		_current_combat_blend = Vector2.ZERO
-		anim_tree.set("parameters/Combat/blend_position", _current_combat_blend)
+		anim_tree.set("parameters/StateMachine/Combat/blend_position", _current_combat_blend)
 		var wants_move := Input.get_vector("move_left", "move_right", "move_forward", "move_back").length() > 0.1
 		if current == &"CrouchLocomotion":
 			playback.travel("Locomotion")
@@ -625,15 +654,14 @@ func _get_combat_strafe_blend(move_dir: Vector3) -> Vector2:
 		clampf(right.dot(move_dir), -1.0, 1.0),
 		clampf(forward.dot(move_dir), -1.0, 1.0)
 	)
-	# Snap to cardinal direction (no diagonals)
-	if abs(raw.x) >= abs(raw.y):
-		return Vector2(signf(raw.x), 0.0)
-	else:
-		return Vector2(0.0, signf(raw.y))
+	# Map circular input into the combat blend-space diamond so diagonals
+	# blend between cardinals instead of snapping to one axis.
+	var diamond_scale := maxf(absf(raw.x) + absf(raw.y), 1.0)
+	return raw / diamond_scale
 
 # ── Root Motion ──────────────────────────────────────────────────────────────
 
-func _apply_motion(delta: float, move_dir: Vector3) -> void:
+func _apply_motion(delta: float, _move_dir: Vector3) -> void:
 	var loco_mod := _get_locomotion_modifier()
 	var root_motion := anim_tree.get_root_motion_position()
 	root_motion = visual_root.global_transform.basis * root_motion
@@ -656,8 +684,8 @@ func _handle_attack_intent() -> void:
 
 
 func ensure_combat_target(max_range: float = -1.0) -> CharacterBody3D:
-	var range := combat_enter_range if max_range < 0.0 else max_range
-	var target := _acquire_combat_target(range)
+	var target_range := combat_enter_range if max_range < 0.0 else max_range
+	var target := _acquire_combat_target(target_range)
 	if not target:
 		target = _combat_target if is_instance_valid(_combat_target) else null
 	if not target:
@@ -1020,6 +1048,36 @@ func _enter_combat_from_damage(from_world_pos: Vector3) -> void:
 		enter_combat_mode()
 
 
+func _buffer_inputs_while_locked(delta: float, input: Vector2, move_dir: Vector3) -> void:
+	if not _player_combat:
+		return
+	# Buffer dodge during action lock
+	if _player_combat.has_method("buffer_dodge"):
+		if Input.is_action_just_pressed("dodge_modifier"):
+			_player_combat.buffer_dodge(move_dir, input, false)
+			return
+		if Input.is_action_just_pressed("jump"):
+			_player_combat.buffer_dodge(move_dir, input, true)
+			return
+	# Buffer attack — track hold for heavy vs light
+	if Input.is_action_just_pressed("attack"):
+		_attack_held = true
+		_attack_hold_time = 0.0
+	if _attack_held:
+		_attack_hold_time += delta
+		if not Input.is_action_pressed("attack"):
+			_attack_held = false
+			if _player_combat.has_method("buffer_attack"):
+				_player_combat.buffer_attack(false)
+		elif _attack_hold_time >= heavy_attack_hold_threshold:
+			_attack_held = false
+			if _player_combat.has_method("buffer_attack"):
+				_player_combat.buffer_attack(true)
+	# Buffer kick
+	if Input.is_action_just_pressed("evade") and _player_combat.has_method("request_kick"):
+		_player_combat.request_kick()
+
+
 func _sync_block_state() -> void:
 	if not _player_combat or not _player_combat.has_method("set_blocking"):
 		return
@@ -1039,9 +1097,18 @@ func _sync_block_state() -> void:
 
 func _get_locomotion_modifier() -> float:
 	var loco_node := get_node_or_null("TerrainLocomotion")
+	var terrain_modifier := 1.0
 	if loco_node and "locomotion_modifier" in loco_node:
-		return loco_node.locomotion_modifier
-	return 1.0
+		terrain_modifier = loco_node.locomotion_modifier
+	return terrain_modifier * _external_locomotion_modifier
+
+
+func set_external_locomotion_modifier(value: float) -> void:
+	_external_locomotion_modifier = maxf(value, 0.0)
+
+
+func clear_external_locomotion_modifier() -> void:
+	_external_locomotion_modifier = 1.0
 
 
 func _get_stamina_mult() -> float:
@@ -1095,10 +1162,10 @@ func _resolve_death_animation(from_world_pos: Vector3) -> StringName:
 	return _resolve_loaded_death_animation(death_from_front_anim if local.z < 0.0 else death_from_back_anim)
 
 
-func _resolve_loaded_death_animation(name: StringName) -> StringName:
+func _resolve_loaded_death_animation(anim_name: StringName) -> StringName:
 	if not anim_player:
-		return name
-	var raw := str(name)
+		return anim_name
+	var raw := str(anim_name)
 	var candidates: Array[String] = [raw]
 	if raw.contains("PlayerDeaths/"):
 		candidates.append(raw.replace("PlayerDeaths/", "player_deaths/"))
@@ -1108,4 +1175,4 @@ func _resolve_loaded_death_animation(name: StringName) -> StringName:
 		var animation_name := StringName(candidate)
 		if anim_player.has_animation(animation_name):
 			return animation_name
-	return name
+	return anim_name

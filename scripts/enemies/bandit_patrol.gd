@@ -219,6 +219,14 @@ func _resume() -> void:
 		_change_state(State.POSTED)
 
 
+func pause_patrol() -> void:
+	_pause()
+
+
+func resume_patrol() -> void:
+	_resume()
+
+
 func _reset_wander_timer() -> void:
 	_wander_timer = randf_range(wander_interval_min, wander_interval_max)
 

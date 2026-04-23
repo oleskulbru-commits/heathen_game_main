@@ -35,6 +35,24 @@ const SOURCES := {
 	"res://assets/animations/player_animations/gadget_animations/gadget_animations.glb": {
 		"output": "player_gadgets.res",
 	},
+	"res://assets/animations/player_animations/action_adventure_animations/action_adventure_animations.glb": {
+		"output": "player_action_adventure.res",
+		"rename": {
+			"idle": "idle",
+			"walking": "walk",
+			"running": "run",
+			"run to stop": "run_to_stop",
+			"run_to_stop": "run_to_stop",
+			"jumping up": "jump_start",
+			"jumping_up": "jump_start",
+			"falling idle": "fall_loop",
+			"falling_idle": "fall_loop",
+			"falling to roll": "landing_roll",
+			"falling_to_roll": "landing_roll",
+			"hard landing": "landing_hard",
+			"hard_landing": "landing_hard",
+		},
+	},
 }
 
 

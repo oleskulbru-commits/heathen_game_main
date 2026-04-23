@@ -1,4 +1,5 @@
 extends Node
+
 ## Manages a squad of bandits in a camp / area.
 ## Discovers nearby bandits (via "bandit" group), assigns tactical roles
 ## (investigator, watcher, searcher, torch-grabber), and relays group signals
@@ -97,7 +98,7 @@ func _prune_dead() -> void:
 		if not is_instance_valid(m):
 			members.remove_at(i)
 			_roles.erase(m)
-		elif m.has_method("is_dead") and bool(m.is_dead()):
+		elif m is ICombatTarget and m.is_dead():
 			members.remove_at(i)
 			_roles.erase(m)
 		i -= 1
@@ -162,11 +163,11 @@ func _fan_search_positions(center: Vector3, count: int) -> Array[Vector3]:
 
 
 func _get_alive_members() -> Array[CharacterBody3D]:
-	var alive: Array[CharacterBody3D] = []
-	for m in members:
-		if is_instance_valid(m) and not (m.has_method("is_dead") and bool(m.is_dead())):
-			alive.append(m)
-	return alive
+		var alive: Array[CharacterBody3D] = []
+		for m in members:
+			if is_instance_valid(m) and (not (m is ICombatTarget) or not m.is_dead()):
+				alive.append(m)
+		return alive
 
 
 # --- Signal callbacks ---

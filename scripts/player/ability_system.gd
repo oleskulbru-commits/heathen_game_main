@@ -1,33 +1,89 @@
 extends Node
-## Ability system — manages the radial menu and executes Norse abilities.
+## Ability system — manages spell/gadget loadout and the radial menu.
 ## Attach as a child of the player CharacterBody3D.
 ##
-## Abilities:
-##   0 = Drukna   — extinguish all flames within 5 m
-##   1 = Hrafn    — teleport-dash 5 m in camera-facing direction
-##   2 = Gellir   — freeze all enemies within 3 m for 5 s
+## 5 slots: 3 Taufr (spells) + 2 Alchemies (gadgets).
+## Hold Q → radial menu; release to select; tap Q → cast selected slot.
 
-signal ability_used(index: int, name: String)
+signal ability_used(slot: int, name: String)
+signal spell_selected(slot: int, name: String)
 signal radial_open_requested()
 signal radial_close_requested()
+signal hugr_changed(value: float)
+
+const SpellFullScript := preload("res://scripts/player/spells/spell_full.gd")
 
 const HOLD_THRESHOLD := 0.2
-const DRUKNA_RANGE := 5.0
-const HRAFN_RANGE := 5.0
-const GELLIR_RANGE := 3.0
-const GELLIR_DURATION := 5.0
-const ABILITY_NAMES := ["Drukna", "Hrafn", "Gellir"]
+const SLOT_COUNT := 5
+enum ModifierCastMode { NONE, SUSTAINED, TARGETED }
+## Hugr — the panic meter.  0 = calm, 1 = full panic.
+const HUGR_DECAY_RATE := 0.02  ## Per second when not casting
 
-var selected_ability: int = 0
+var selected_slot: int = 0
 var _q_pressed_time: float = -1.0
 var _menu_is_open: bool = false
 var _radial_menu: Control  # set by HUD after ready
 var _player: CharacterBody3D
 var _prev_mouse_mode: Input.MouseMode
+var _hugr: float = 0.0  ## Current panic level
+var _modifier_cast_spell: SpellBase = null
+var _modifier_cast_mode: ModifierCastMode = ModifierCastMode.NONE
+
+## The 5 equipped abilities.  null = empty slot.
+var slots: Array = [null, null, null, null, null]  # Array of SpellBase
 
 
 func _ready() -> void:
 	_player = get_parent() as CharacterBody3D
+	# Default loadout for prototyping — Dash in slot 0
+	_equip_default_loadout()
+
+
+func _equip_default_loadout() -> void:
+	var dash := SpellDash.new()
+	var full: SpellBase = SpellFullScript.new()
+	equip(0, dash)
+	equip(1, full)
+
+
+func equip(slot: int, spell: SpellBase) -> void:
+	if slot < 0 or slot >= SLOT_COUNT:
+		return
+	# Cancel any active spell in the slot being replaced
+	if slots[slot] and slots[slot].is_active():
+		slots[slot].cancel(_player)
+	slots[slot] = spell
+	_sync_radial_menu()
+
+
+func unequip(slot: int) -> void:
+	equip(slot, null)
+
+
+func get_selected_spell() -> SpellBase:
+	if selected_slot < 0 or selected_slot >= SLOT_COUNT:
+		return null
+	return slots[selected_slot]
+
+
+func _sync_radial_menu() -> void:
+	if not _radial_menu:
+		return
+	var names: Array[String] = []
+	var descs: Array[String] = []
+	var types: Array[int] = []
+	for i in SLOT_COUNT:
+		var spell: SpellBase = slots[i]
+		if spell:
+			names.append(spell.verb_name)
+			descs.append(spell.description)
+			types.append(spell.slot_type)
+		else:
+			names.append("Empty")
+			descs.append("")
+			types.append(0)
+	if _radial_menu.has_method("update_slots"):
+		_radial_menu.update_slots(names, descs, types)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -35,35 +91,74 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.is_action_pressed("curse_pulse"):
+		if Input.is_action_pressed("focus") and _try_start_targeted_cast():
+			return
+		if Input.is_action_pressed("sprint") and _try_start_modifier_cast():
+			return
 		_q_pressed_time = Time.get_ticks_msec() / 1000.0
+		return
 
 	if event.is_action_released("curse_pulse"):
+		if _modifier_cast_spell:
+			if _modifier_cast_mode == ModifierCastMode.TARGETED:
+				_confirm_targeted_cast()
+			else:
+				_stop_modifier_cast()
+			return
+		if _q_pressed_time < 0.0:
+			return
 		var held := Time.get_ticks_msec() / 1000.0 - _q_pressed_time
 		_q_pressed_time = -1.0
 
 		if _menu_is_open:
-			# Close menu and confirm selection
 			_close_menu()
 		elif held < HOLD_THRESHOLD:
-			# Tap — use selected ability
-			_use_ability(selected_ability)
-
-
-func _process(_delta: float) -> void:
-	if _q_pressed_time < 0.0 or _menu_is_open:
+			_cast_selected()
 		return
-	var held := Time.get_ticks_msec() / 1000.0 - _q_pressed_time
-	if held >= HOLD_THRESHOLD:
-		_open_menu()
+
+	if event.is_action_released("sprint") and _modifier_cast_spell and _modifier_cast_mode == ModifierCastMode.SUSTAINED:
+		_stop_modifier_cast()
+		return
+
+	if event.is_action_released("focus") and _modifier_cast_spell and _modifier_cast_mode == ModifierCastMode.TARGETED:
+		_confirm_targeted_cast()
+
+
+func _process(delta: float) -> void:
+	if _modifier_cast_spell and not _modifier_cast_spell.is_active():
+		_clear_modifier_cast_state()
+
+	# Check if we should open the radial menu
+	if _q_pressed_time >= 0.0 and not _menu_is_open and not _modifier_cast_spell:
+		var held := Time.get_ticks_msec() / 1000.0 - _q_pressed_time
+		if held >= HOLD_THRESHOLD:
+			_open_menu()
+
+	# Update all spell cooldowns
+	for spell in slots:
+		if spell:
+			spell.update(delta)
+
+	# Decay Hugr over time
+	if _hugr > 0.0:
+		_hugr = maxf(0.0, _hugr - HUGR_DECAY_RATE * delta)
+		hugr_changed.emit(_hugr)
+
+
+func _physics_process(delta: float) -> void:
+	# Update active spells (e.g. dash movement)
+	for spell in slots:
+		if spell and spell.is_active():
+			spell.physics_update(_player, delta)
 
 
 func _open_menu() -> void:
 	_menu_is_open = true
 	_prev_mouse_mode = Input.mouse_mode
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	# Warp mouse to screen center so wedge selection starts neutral
 	var center := get_viewport().get_visible_rect().size * 0.5
 	Input.warp_mouse(center)
+	_sync_radial_menu()
 	if _radial_menu:
 		_radial_menu.open()
 	radial_open_requested.emit()
@@ -74,75 +169,88 @@ func _close_menu() -> void:
 	if _radial_menu:
 		var picked: int = _radial_menu.close()
 		if picked >= 0:
-			selected_ability = picked
+			selected_slot = picked
+			var spell := get_selected_spell()
+			var sname := spell.verb_name if spell else "Empty"
+			spell_selected.emit(selected_slot, sname)
 	Input.mouse_mode = _prev_mouse_mode
 	radial_close_requested.emit()
 
 
-func _use_ability(index: int) -> void:
-	match index:
-		0: _drukna()
-		1: _hrafn()
-		2: _gellir()
-	ability_used.emit(index, ABILITY_NAMES[index])
-
-
-# ── Drukna — Extinguish Flames ──────────────────────────────────────────────
-
-func _drukna() -> void:
-	var pos := _player.global_position
-	var torches: Array[Node] = []
-	torches.append_array(get_tree().get_nodes_in_group("torch"))
-	if torches.is_empty():
-		torches.append_array(get_tree().get_nodes_in_group("flame"))
-	for torch in torches:
-		if not is_instance_valid(torch):
-			continue
-		if torch.global_position.distance_to(pos) > DRUKNA_RANGE:
-			continue
-		# Turn off flame, light, and particles
-		for child in torch.get_children():
-			if child is OmniLight3D or child is GPUParticles3D:
-				child.visible = false
-			elif child is MeshInstance3D and child.name == "Flame":
-				child.visible = false
-
-
-# ── Hrafn — Teleport Dash ───────────────────────────────────────────────────
-
-func _hrafn() -> void:
-	var cam_pivot := _player.get_node_or_null("CameraPivot") as Node3D
-	if not cam_pivot:
+func _cast_selected() -> void:
+	var spell := get_selected_spell()
+	if not spell:
 		return
-	var cam_basis := cam_pivot.global_transform.basis
-	var forward := -cam_basis.z
-	forward.y = 0.0
-	forward = forward.normalized()
+	if not spell.is_ready():
+		return
+	# Don't cast while another spell is active
+	for s in slots:
+		if s and s.is_active():
+			return
 
-	var origin := _player.global_position + Vector3(0.0, 0.5, 0.0)
-	var destination := origin + forward * HRAFN_RANGE
-
-	# Raycast to avoid teleporting into geometry
-	var space := _player.get_world_3d().direct_space_state
-	var query := PhysicsRayQueryParameters3D.create(origin, destination)
-	query.collision_mask = 1
-	query.exclude = [_player.get_rid()]
-	var result := space.intersect_ray(query)
-	if result:
-		destination = result.position - forward * 0.5
-
-	destination.y = _player.global_position.y
-	_player.global_position = destination
+	if spell.cast(_player):
+		# Apply Hugr
+		_hugr = clampf(_hugr + spell.hugr_cost, 0.0, 1.0)
+		hugr_changed.emit(_hugr)
+		ability_used.emit(selected_slot, spell.verb_name)
 
 
-# ── Gellir — Freeze Enemies ─────────────────────────────────────────────────
+func _try_start_modifier_cast() -> bool:
+	var spell := get_selected_spell()
+	if not spell:
+		return false
+	for active_spell in slots:
+		if active_spell and active_spell.is_active():
+			return false
+	if not spell.can_start_sustained(_player):
+		return false
+	if not spell.start_sustained(_player):
+		return false
+	_modifier_cast_spell = spell
+	_modifier_cast_mode = ModifierCastMode.SUSTAINED
+	_hugr = clampf(_hugr + spell.hugr_cost, 0.0, 1.0)
+	hugr_changed.emit(_hugr)
+	ability_used.emit(selected_slot, spell.verb_name)
+	return true
 
-func _gellir() -> void:
-	var pos := _player.global_position
-	for bandit in get_tree().get_nodes_in_group("bandit"):
-		if not is_instance_valid(bandit):
-			continue
-		if bandit.global_position.distance_to(pos) > GELLIR_RANGE:
-			continue
-		if bandit.has_method("freeze"):
-			bandit.freeze(GELLIR_DURATION)
+
+func _try_start_targeted_cast() -> bool:
+	var spell := get_selected_spell()
+	if not spell:
+		return false
+	for active_spell in slots:
+		if active_spell and active_spell.is_active():
+			return false
+	if not spell.can_start_targeted(_player):
+		return false
+	if not spell.start_targeted(_player):
+		return false
+	_modifier_cast_spell = spell
+	_modifier_cast_mode = ModifierCastMode.TARGETED
+	return true
+
+
+func _confirm_targeted_cast() -> void:
+	if not _modifier_cast_spell:
+		return
+	var spell := _modifier_cast_spell
+	var cast_succeeded: bool = spell.confirm_targeted(_player)
+	_clear_modifier_cast_state()
+	if not cast_succeeded:
+		return
+	_hugr = clampf(_hugr + spell.hugr_cost, 0.0, 1.0)
+	hugr_changed.emit(_hugr)
+	ability_used.emit(selected_slot, spell.verb_name)
+
+
+func _stop_modifier_cast() -> void:
+	if not _modifier_cast_spell:
+		return
+	_modifier_cast_spell.cancel(_player)
+	_clear_modifier_cast_state()
+
+
+func _clear_modifier_cast_state() -> void:
+	_modifier_cast_spell = null
+	_modifier_cast_mode = ModifierCastMode.NONE
+	_q_pressed_time = -1.0

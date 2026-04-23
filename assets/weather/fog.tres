@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="WeatherState" format=3]
+
+[ext_resource type="Script" uid="uid://placeholder_weather_state" path="res://scripts/game/weather_state.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+cloud_coverage = 0.35
+cloud_density = 0.6
+cloud_softness = 0.25
+cloud_speed = 0.001
+cloud_bright_color = Color(0.7, 0.72, 0.75, 1)
+cloud_shadow_color = Color(0.35, 0.38, 0.42, 1)
+fog_density = 0.004
+fog_light_energy = 0.35
+volumetric_fog_density = 0.04
+fog_color_day = Color(0.6, 0.63, 0.68, 1)
+fog_color_night = Color(0.04, 0.05, 0.09, 1)
+sky_energy_multiplier = 0.6
+rayleigh_coefficient = 1.5
+mie_coefficient = 0.01
+turbidity = 8.0
+sun_energy_scale = 0.5
+ambient_energy_scale = 0.7
+transition_duration = 20.0

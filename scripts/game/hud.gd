@@ -12,6 +12,7 @@ var _stamina_tween: Tween
 var _eye_tween: Tween
 var _iris_tween: Tween
 var _light_probe: Node
+var _player: Node
 
 ## HDR fiery orange — multiplies the brighter eye textures to a vivid glow
 const EYE_LIT := Color(5.0, 2.5, 0.6, 1.0)
@@ -22,24 +23,35 @@ const EYE_INACTIVE := Color(1.3, 1.2, 1.1, 1.0)
 
 
 func _ready() -> void:
+	_bind_player.call_deferred()
+
+
+func _bind_player() -> void:
 	var player := _find_player()
-	if player:
-		if player.has_signal("health_changed"):
-			player.health_changed.connect(_on_health_changed)
-		if player.has_signal("stamina_changed"):
-			player.stamina_changed.connect(_on_stamina_changed)
-		if player.has_method("get_health"):
-			_on_health_changed(player.get_health(), player.max_health)
-		if player.has_method("get_stamina"):
-			_on_stamina_changed(player.get_stamina(), player.max_stamina)
+	if not player:
+		await get_tree().process_frame
+		player = _find_player()
+		if not player:
+			return
+	if not player.is_node_ready():
+		await player.ready
+	_player = player
+	if player.has_signal("health_changed") and not player.health_changed.is_connected(_on_health_changed):
+		player.health_changed.connect(_on_health_changed)
+	if player.has_signal("stamina_changed") and not player.stamina_changed.is_connected(_on_stamina_changed):
+		player.stamina_changed.connect(_on_stamina_changed)
+	if player is ICombatTarget and player.has_method("get_max_health") and player.has_method("get_max_stamina"):
+		_on_health_changed(player.get_health(), player.get_max_health())
+		_on_stamina_changed(player.get_stamina(), player.get_max_stamina())
 
-		_light_probe = player.get_node_or_null("LightProbe")
-		if _light_probe:
-			_light_probe.visibility_changed.connect(_on_visibility_changed)
+	_light_probe = player.get_node_or_null("LightProbe")
+	if _light_probe and not _light_probe.visibility_changed.is_connected(_on_visibility_changed):
+		_light_probe.visibility_changed.connect(_on_visibility_changed)
 
-		var ability_system := player.get_node_or_null("AbilitySystem")
-		if ability_system and radial_menu:
-			ability_system._radial_menu = radial_menu
+	var ability_system := player.get_node_or_null("AbilitySystem")
+	if ability_system and radial_menu:
+		ability_system._radial_menu = radial_menu
+		ability_system._sync_radial_menu()
 
 
 func _find_player() -> Node:

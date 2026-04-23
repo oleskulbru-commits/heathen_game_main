@@ -1,9 +1,9 @@
 extends Node
-## Procedural foot IK for terrain adaptation.
+## Procedural foot IK for humanoid terrain adaptation.
 ## Raycasts below each animated foot position, adjusts hip height, and solves
 ## two-bone IK per leg so feet land naturally on uneven ground.
-## Call update() from the player controller BEFORE head-look so the hip offset
-## propagates to the spine chain.
+## Call update() from the owning controller after animation updates so the
+## overrides land on top of the animated pose.
 
 # ── Exports ──────────────────────────────────────────────────────────────────
 @export var enabled: bool = true
@@ -14,10 +14,12 @@ extends Node
 @export var foot_height: float = 0.05       ## Small clearance above ground
 @export var max_step: float = 0.4           ## Max terrain offset we IK for
 @export var ground_mask: int = 1            ## Physics collision mask for ground
+@export var skeleton_path: NodePath
 
 # ── Internal refs ────────────────────────────────────────────────────────────
 var _skeleton: Skeleton3D
 var _character: CharacterBody3D
+var _terrain_nodes: Array[Node] = []
 
 # ── Bone indices (discovered at runtime) ─────────────────────────────────────
 var _hips_idx: int = -1
@@ -49,21 +51,47 @@ func _ready() -> void:
 		push_error("[FootIK] Parent must be CharacterBody3D")
 		enabled = false
 		return
-	_skeleton = _character.get_node_or_null("xbot_root/Armature/Skeleton3D") as Skeleton3D
+	_skeleton = _resolve_skeleton()
 	if not _skeleton:
-		push_error("[FootIK] Skeleton3D not found at xbot_root/Armature/Skeleton3D")
+		push_error("[FootIK] Skeleton3D not found for parent %s" % _character.name)
 		enabled = false
 		return
 	_init_bones()
 
+
+func _resolve_skeleton() -> Skeleton3D:
+	if not skeleton_path.is_empty():
+		var explicit := _character.get_node_or_null(skeleton_path) as Skeleton3D
+		if explicit:
+			return explicit
+	for candidate in [
+		^"xbot_root/Armature/Skeleton3D",
+		^"ybot_root/Armature/Skeleton3D",
+		^"Armature/Skeleton3D",
+	]:
+		var skeleton := _character.get_node_or_null(candidate) as Skeleton3D
+		if skeleton:
+			return skeleton
+	return _character.find_child("Skeleton3D", true, false) as Skeleton3D
+
 func _init_bones() -> void:
-	_hips_idx      = _find_bone(["hips", "Hips", "pelvis", "mixamorig_Hips"])
-	_l_upper_idx   = _find_bone(["LeftUpLeg", "upper_leg.L", "thigh.L", "left_upper_leg", "mixamorig_LeftUpLeg"])
-	_l_lower_idx   = _find_bone(["LeftLeg", "lower_leg.L", "shin.L", "calf.L", "left_lower_leg", "mixamorig_LeftLeg"])
-	_l_foot_idx    = _find_bone(["LeftFoot", "foot.L", "left_foot", "mixamorig_LeftFoot"])
-	_r_upper_idx   = _find_bone(["RightUpLeg", "upper_leg.R", "thigh.R", "right_upper_leg", "mixamorig_RightUpLeg"])
-	_r_lower_idx   = _find_bone(["RightLeg", "lower_leg.R", "shin.R", "calf.R", "right_lower_leg", "mixamorig_RightLeg"])
-	_r_foot_idx    = _find_bone(["RightFoot", "foot.R", "right_foot", "mixamorig_RightFoot"])
+	_hips_idx = _find_bone(["hips", "Hips", "pelvis", "mixamorig_Hips", "mixamorig:Hips"])
+	var left_chain := _resolve_leg_chain(
+		["LeftFoot", "foot.L", "left_foot", "mixamorig_LeftFoot", "mixamorig:LeftFoot"],
+		["LeftLeg", "lower_leg.L", "leg.L", "shin.L", "calf.L", "left_lower_leg", "mixamorig_LeftLeg", "mixamorig:LeftLeg"],
+		["LeftUpLeg", "upper_leg.L", "upperleg.L", "thigh.L", "left_upper_leg", "mixamorig_LeftUpLeg", "mixamorig:LeftUpLeg"]
+	)
+	_l_upper_idx = int(left_chain.get("upper", -1))
+	_l_lower_idx = int(left_chain.get("lower", -1))
+	_l_foot_idx = int(left_chain.get("foot", -1))
+	var right_chain := _resolve_leg_chain(
+		["RightFoot", "foot.R", "right_foot", "mixamorig_RightFoot", "mixamorig:RightFoot"],
+		["RightLeg", "lower_leg.R", "leg.R", "shin.R", "calf.R", "right_lower_leg", "mixamorig_RightLeg", "mixamorig:RightLeg"],
+		["RightUpLeg", "upper_leg.R", "upperleg.R", "thigh.R", "right_upper_leg", "mixamorig_RightUpLeg", "mixamorig:RightUpLeg"]
+	)
+	_r_upper_idx = int(right_chain.get("upper", -1))
+	_r_lower_idx = int(right_chain.get("lower", -1))
+	_r_foot_idx = int(right_chain.get("foot", -1))
 
 	var all_ok := (_hips_idx >= 0 and _l_upper_idx >= 0 and _l_lower_idx >= 0
 		and _l_foot_idx >= 0 and _r_upper_idx >= 0 and _r_lower_idx >= 0
@@ -90,11 +118,55 @@ func _init_bones() -> void:
 
 func _find_bone(names: Array) -> int:
 	for bone_name in names:
-		var idx := _skeleton.find_bone(bone_name)
+		var idx := _find_bone_normalized(str(bone_name))
 		if idx >= 0:
 			return idx
 	push_warning("[FootIK] Bone not found, tried: %s" % str(names))
 	return -1
+
+
+func _find_bone_normalized(bone_name: String) -> int:
+	var exact := _skeleton.find_bone(bone_name)
+	if exact >= 0:
+		return exact
+	var target := _normalize_bone_name(bone_name)
+	for idx in _skeleton.get_bone_count():
+		if _normalize_bone_name(_skeleton.get_bone_name(idx)) == target:
+			return idx
+	return -1
+
+
+func _normalize_bone_name(bone_name: String) -> String:
+	var normalized := bone_name.to_lower()
+	normalized = normalized.replace("mixamorig:", "")
+	normalized = normalized.replace("mixamorig_", "")
+	normalized = normalized.replace("-", "")
+	normalized = normalized.replace("_", "")
+	normalized = normalized.replace(".", "")
+	normalized = normalized.replace(" ", "")
+	return normalized
+
+
+func _resolve_leg_chain(foot_names: Array, lower_names: Array, upper_names: Array) -> Dictionary:
+	var foot_idx := _find_bone(foot_names)
+	var lower_idx := _find_bone(lower_names)
+	var upper_idx := _find_bone(upper_names)
+	if foot_idx >= 0 and lower_idx < 0:
+		lower_idx = _skeleton.get_bone_parent(foot_idx)
+	if lower_idx >= 0 and upper_idx < 0:
+		upper_idx = _skeleton.get_bone_parent(lower_idx)
+	if foot_idx < 0 and lower_idx >= 0:
+		for child_idx in _skeleton.get_bone_count():
+			if _skeleton.get_bone_parent(child_idx) == lower_idx:
+				var child_name := _normalize_bone_name(_skeleton.get_bone_name(child_idx))
+				if child_name.contains("foot"):
+					foot_idx = child_idx
+					break
+	return {
+		"upper": upper_idx,
+		"lower": lower_idx,
+		"foot": foot_idx,
+	}
 
 # ── Public API (called by player_controller before head-look) ───────────────
 
@@ -167,10 +239,14 @@ func _apply_foot_ik(delta: float) -> void:
 	_l_normal = _l_normal.lerp(l_norm, t).normalized()
 	_r_normal = _r_normal.lerp(r_norm, t).normalized()
 
-	# ── 6. Hip offset = most-negative foot offset (lower body to reach) ──
-	var target_hip := minf(_l_foot_offset, _r_foot_offset)
-	if target_hip > 0.0:
-		target_hip = 0.0  # Never raise hips above animated height
+	# ── 6. Lower hips only when a foot target is actually out of reach ──
+	var target_hip := _compute_required_hip_lowering(
+		skel_xform,
+		l_up_pose,
+		r_up_pose,
+		l_foot_world + Vector3(0.0, _l_foot_offset, 0.0),
+		r_foot_world + Vector3(0.0, _r_foot_offset, 0.0)
+	)
 	_hip_offset = lerpf(_hip_offset, target_hip, clampf(hip_interp_speed * delta, 0.0, 1.0))
 
 	# ── 7. Apply hips override ───────────────────────────────────────────
@@ -195,6 +271,34 @@ func _apply_foot_ik(delta: float) -> void:
 		_r_upper_idx, _r_lower_idx, _r_foot_idx,
 		_r_upper_len, _r_lower_len, _r_normal, hip_offset_skel, skel_xform)
 
+
+func _compute_required_hip_lowering(
+	skell_xform: Transform3D,
+	l_up_pose: Transform3D,
+	r_up_pose: Transform3D,
+	l_target_world: Vector3,
+	r_target_world: Vector3
+) -> float:
+	var left_needed := _get_leg_required_lowering(skell_xform, l_up_pose.origin, l_target_world, _l_upper_len, _l_lower_len)
+	var right_needed := _get_leg_required_lowering(skell_xform, r_up_pose.origin, r_target_world, _r_upper_len, _r_lower_len)
+	var required := maxf(left_needed, right_needed)
+	return -minf(required, max_step)
+
+
+func _get_leg_required_lowering(
+	skel_xform: Transform3D,
+	hip_origin_skel: Vector3,
+	foot_target_world: Vector3,
+	upper_len: float,
+	lower_len: float
+) -> float:
+	var hip_world: Vector3 = skel_xform * hip_origin_skel
+	var max_reach := maxf(upper_len + lower_len - 0.01, 0.01)
+	var dist := hip_world.distance_to(foot_target_world)
+	if dist <= max_reach:
+		return 0.0
+	return dist - max_reach
+
 # ── Two-bone IK solver ──────────────────────────────────────────────────────
 
 func _solve_leg(
@@ -202,9 +306,9 @@ func _solve_leg(
 	foot_target: Vector3,
 	upper_idx: int, lower_idx: int, foot_idx: int,
 	upper_len: float, lower_len: float,
-	ground_normal: Vector3,
+	_ground_normal: Vector3,
 	hip_offset_skel: Vector3,
-	skel_xform: Transform3D
+	_skel_xform: Transform3D
 ) -> void:
 	# Joint positions in skeleton space (shifted by hip offset)
 	var hip_pos: Vector3  = upper_pose.origin + hip_offset_skel
@@ -262,16 +366,11 @@ func _solve_leg(
 		mod.basis = Basis(rot) * lower_pose.basis
 		_skeleton.set_bone_global_pose_override(lower_idx, mod, 1.0, true)
 
-	# ── Apply foot rotation to match ground slope ────────────────────────
-	var skel_normal: Vector3 = (skel_xform.basis.inverse() * ground_normal).normalized()
-	var foot_up: Vector3 = foot_pose.basis.y.normalized()
+	# Preserve the animated ankle orientation. This rig's foot axis does not
+	# match the solver's old "basis.y is sole-up" assumption, which bends feet.
 	var foot_mod := Transform3D()
 	foot_mod.origin = clamped_target
-	if foot_up.length_squared() > 0.001 and skel_normal.length_squared() > 0.001:
-		var rot := _quat_between(foot_up, skel_normal)
-		foot_mod.basis = Basis(rot) * foot_pose.basis
-	else:
-		foot_mod.basis = foot_pose.basis
+	foot_mod.basis = foot_pose.basis
 	_skeleton.set_bone_global_pose_override(foot_idx, foot_mod, 1.0, true)
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -288,7 +387,69 @@ func _raycast_ground(foot_world: Vector3) -> Dictionary:
 	var to := foot_world - Vector3.UP * ray_down
 	var query := PhysicsRayQueryParameters3D.create(from, to, ground_mask)
 	query.exclude = [_character.get_rid()]
-	return space.intersect_ray(query)
+	var hit := space.intersect_ray(query)
+	if not hit.is_empty():
+		return hit
+	return _sample_terrain_ground(foot_world, from.y, to.y)
+
+
+func _sample_terrain_ground(foot_world: Vector3, max_y: float, min_y: float) -> Dictionary:
+	var best_hit: Dictionary = {}
+	var best_y := -INF
+	for terrain in _get_terrain_nodes():
+		if not is_instance_valid(terrain) or not ("data" in terrain):
+			continue
+		var data = terrain.data
+		if data == null or not data.has_method("get_height"):
+			continue
+		var sample_pos := Vector3(foot_world.x, 0.0, foot_world.z)
+		var height: float = data.get_height(sample_pos)
+		if is_nan(height):
+			continue
+		if height > max_y or height < min_y:
+			continue
+		if height <= best_y:
+			continue
+		var hit_pos := Vector3(foot_world.x, height, foot_world.z)
+		var normal := Vector3.UP
+		if data.has_method("get_normal"):
+			var sample_normal: Vector3 = data.get_normal(hit_pos)
+			if not is_nan(sample_normal.x):
+				normal = sample_normal.normalized()
+		best_y = height
+		best_hit = {
+			"position": hit_pos,
+			"normal": normal,
+			"node": terrain,
+		}
+	return best_hit
+
+
+func _get_terrain_nodes() -> Array[Node]:
+	var needs_refresh := _terrain_nodes.is_empty()
+	if not needs_refresh:
+		for terrain in _terrain_nodes:
+			if not is_instance_valid(terrain):
+				needs_refresh = true
+				break
+	if not needs_refresh:
+		return _terrain_nodes
+	_terrain_nodes.clear()
+	var grouped := get_tree().get_nodes_in_group("Terrain3D")
+	for node in grouped:
+		if node is Node:
+			_terrain_nodes.append(node)
+	if _terrain_nodes.is_empty():
+		_find_terrains_recursive(get_tree().root)
+	return _terrain_nodes
+
+
+func _find_terrains_recursive(node: Node) -> void:
+	if node.get_class() == "Terrain3D":
+		_terrain_nodes.append(node)
+		return
+	for child in node.get_children():
+		_find_terrains_recursive(child)
 
 func _quat_between(from: Vector3, to: Vector3) -> Quaternion:
 	var d := from.dot(to)

@@ -42,6 +42,22 @@ animation = &"npc_axe/standing_walk_left"
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_combat_right"]
 animation = &"npc_axe/standing_walk_right"
 
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_combat_run_base"]
+animation = &"npc_male_locomotion/running"
+
+[sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_combat_run_arm"]
+filter_enabled = true
+
+[sub_resource type="AnimationNodeBlendTree" id="AnimationNodeBlendTree_combat_run"]
+nodes/output/position = Vector2(420, 100)
+nodes/RunArmMask/node = SubResource("AnimationNodeBlend2_combat_run_arm")
+nodes/RunArmMask/position = Vector2(180, 100)
+nodes/RunBase/node = SubResource("AnimationNodeAnimation_combat_run_base")
+nodes/RunBase/position = Vector2(-120, 40)
+nodes/WeaponArm/node = SubResource("AnimationNodeAnimation_combat_forward")
+nodes/WeaponArm/position = Vector2(-120, 180)
+node_connections = [&"output", 0, &"RunArmMask", &"RunArmMask", 0, &"RunBase", &"RunArmMask", 1, &"WeaponArm"]
+
 [sub_resource type="AnimationNodeBlendSpace2D" id="AnimationNodeBlendSpace2D_combat"]
 blend_point_0/node = SubResource("AnimationNodeAnimation_combat_idle")
 blend_point_0/pos = Vector2(0, 0)
@@ -53,6 +69,8 @@ blend_point_3/node = SubResource("AnimationNodeAnimation_combat_left")
 blend_point_3/pos = Vector2(-1, 0)
 blend_point_4/node = SubResource("AnimationNodeAnimation_combat_right")
 blend_point_4/pos = Vector2(1, 0)
+blend_point_5/node = SubResource("AnimationNodeBlendTree_combat_run")
+blend_point_5/pos = Vector2(0, 2)
 
 [sub_resource type="Curve" id="Curve_xfade_ease"]
 _data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
