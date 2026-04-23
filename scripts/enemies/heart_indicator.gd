@@ -5,20 +5,27 @@ extends MeshInstance3D
 
 const MAX_DISTANCE := 40.0
 const FADE_START := 35.0
+const PULSE_SPEED := 1.2
+const PULSE_STRENGTH := 0.12
+const BASE_COLOR := Color(0.85, 0.12, 0.1, 1.0)
 
 var _player: Node3D
-var _mat: ShaderMaterial
+var _shader_mat: ShaderMaterial
+var _standard_mat: StandardMaterial3D
 var _skel: Skeleton3D
 var _bone_idx: int = -1
 var _dbg_frame: int = 0
+var _base_scale: Vector3 = Vector3.ONE
 
 func _ready() -> void:
 	visible = false
-	_mat = material_override as ShaderMaterial
+	_shader_mat = material_override as ShaderMaterial
+	_standard_mat = material_override as StandardMaterial3D
+	_base_scale = scale
 	var parent_name := "null"
 	if get_parent():
 		parent_name = get_parent().name
-	print("[HeartInd] _ready  mat_ok=", _mat != null, "  parent=", parent_name)
+	print("[HeartInd] _ready  shader_mat=", _shader_mat != null, "  standard_mat=", _standard_mat != null, "  parent=", parent_name)
 
 ## Called by bandit_controller after add_child so we know which bone to track.
 func setup_bone(skel: Skeleton3D, bone_idx: int) -> void:
@@ -63,5 +70,12 @@ func _process(_delta: float) -> void:
 	var alpha := 1.0
 	if dist > FADE_START:
 		alpha = 1.0 - ((dist - FADE_START) / (MAX_DISTANCE - FADE_START))
-	if _mat:
-		_mat.set_shader_parameter("alpha_mult", alpha)
+	var pulse := 1.0 + PULSE_STRENGTH * sin(Time.get_ticks_msec() * 0.001 * PULSE_SPEED * TAU)
+	scale = _base_scale * pulse
+	if _shader_mat:
+		_shader_mat.set_shader_parameter("alpha_mult", alpha)
+	elif _standard_mat:
+		var tint := BASE_COLOR
+		tint.a = alpha
+		_standard_mat.albedo_color = tint
+		_standard_mat.emission = tint

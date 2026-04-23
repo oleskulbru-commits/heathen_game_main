@@ -29,9 +29,9 @@ func _setup() -> void:
 	tree.active = true
 
 	# Force locomotion with jog
-	tree.set("parameters/conditions/is_moving", true)
-	tree.set("parameters/conditions/is_stopping", false)
-	tree.set("parameters/Locomotion/blend_position", 1.0)  # jog
+	tree.set("parameters/StateMachine/conditions/is_moving", true)
+	tree.set("parameters/StateMachine/conditions/is_stopping", false)
+	tree.set("parameters/StateMachine/Locomotion/blend_position", 1.0)  # jog
 
 	print("=== Root Motion Test ===")
 	print("  root_motion_track: ", tree.root_motion_track)

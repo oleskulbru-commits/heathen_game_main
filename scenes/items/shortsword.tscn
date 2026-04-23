@@ -1,7 +1,9 @@
-[gd_scene format=3]
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/common/weapon_component.gd" id="1_weapon_component"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hitbox"]
-size = Vector3(0.25, 0.65, 0.25)
+size = Vector3(0.26, 3, 0.26)
 
 [sub_resource type="BoxMesh" id="BoxMesh_blade"]
 size = Vector3(0.05, 0.6, 0.012)
@@ -30,6 +32,7 @@ roughness = 0.8
 size = Vector3(0.05, 0.035, 0.035)
 
 [node name="Shortsword" type="Node3D"]
+script = ExtResource("1_weapon_component")
 
 [node name="Blade" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.38, 0)
@@ -58,6 +61,6 @@ monitoring = false
 monitorable = true
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Hitbox"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.36, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 shape = SubResource("BoxShape3D_hitbox")
 disabled = true

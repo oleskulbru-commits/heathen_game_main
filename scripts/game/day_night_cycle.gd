@@ -1,6 +1,7 @@
 extends Node
 ## Continuous day/night cycle.  Rotates the sun DirectionalLight3D and
 ## interpolates lighting, sky, and fog properties every frame.
+## Works with the custom sky_clouds.gdshader and the WeatherManager.
 
 @export_range(0.0, 24.0) var time_of_day: float = 8.0   ## Start hour (0-24)
 @export_range(1.0, 60.0) var day_length_minutes: float = 10.0  ## Real minutes per game day
@@ -10,7 +11,8 @@ var _sun: DirectionalLight3D
 var _fill: DirectionalLight3D
 var _moon: DirectionalLight3D
 var _env: Environment
-var _sky: PhysicalSkyMaterial
+var _sky_mat: ShaderMaterial
+var _weather: WeatherManager
 
 
 func _ready() -> void:
@@ -27,7 +29,8 @@ func _ready() -> void:
 		_moon.light_angular_distance = 0.3
 		root.add_child.call_deferred(_moon)
 	_env = (root.get_node("WorldEnvironment") as WorldEnvironment).environment
-	_sky = _env.sky.sky_material as PhysicalSkyMaterial
+	_sky_mat = _env.sky.sky_material as ShaderMaterial
+	_weather = root.get_node_or_null("WeatherManager")
 	_tick(time_of_day)
 
 
@@ -47,14 +50,27 @@ func _tick(t: float) -> void:
 	# ── Sun rotation (pitch only – existing yaw preserved) ──────────
 	_sun.rotation.x = -sun_angle
 
+	# ── Weather energy scales ───────────────────────────────────────
+	var sun_scale := 1.0
+	var ambient_scale := 1.0
+	if _weather and _weather.current_state:
+		if _weather.blend < 1.0:
+			sun_scale = lerpf(_weather.current_state.sun_energy_scale,
+				_weather.target_state.sun_energy_scale, _weather.blend)
+			ambient_scale = lerpf(_weather.current_state.ambient_energy_scale,
+				_weather.target_state.ambient_energy_scale, _weather.blend)
+		else:
+			sun_scale = _weather.target_state.sun_energy_scale
+			ambient_scale = _weather.target_state.ambient_energy_scale
+
 	# ── Sun colour / energy ─────────────────────────────────────────
 	if above:
-		_sun.light_energy = lerpf(0.3, 1.0, h)
-		_sun.light_indirect_energy = lerpf(1.0, 1.8, h)
+		_sun.light_energy = lerpf(0.3, 1.0, h) * sun_scale
+		_sun.light_indirect_energy = lerpf(1.0, 1.8, h) * sun_scale
 		_sun.light_color = Color(1.0, 0.55, 0.25).lerp(Color(1.0, 0.97, 0.9), h)
 	else:
-		_sun.light_energy = lerpf(0.12, 0.02, h)
-		_sun.light_indirect_energy = lerpf(0.4, 0.1, h)
+		_sun.light_energy = lerpf(0.12, 0.02, h) * sun_scale
+		_sun.light_indirect_energy = lerpf(0.4, 0.1, h) * sun_scale
 		_sun.light_color = Color(0.35, 0.4, 0.65).lerp(Color(0.2, 0.25, 0.45), h)
 
 	# ── Fill light ──────────────────────────────────────────────────
@@ -79,23 +95,31 @@ func _tick(t: float) -> void:
 		_moon.light_indirect_energy = lerpf(0.2, 0.5, h)
 		_moon.light_volumetric_fog_energy = 0.3
 
-	# ── Sky material ────────────────────────────────────────────────
-	_sky.energy_multiplier = lerpf(0.12, 1.0, smoothstep(-0.15, 0.2, elev))
+	# ── Sky shader ──────────────────────────────────────────────────
+	var sky_energy := lerpf(0.12, 1.0, smoothstep(-0.15, 0.2, elev))
+	_sky_mat.set_shader_parameter("energy_multiplier", sky_energy)
 
+	var ray_col := Color(0.26, 0.41, 0.58)
 	if above and h < 0.6:
-		# Warm violet tint at sunrise / sunset
-		_sky.rayleigh_color = Color(0.26, 0.41, 0.58).lerp(
-			Color(0.5, 0.35, 0.5), 1.0 - h / 0.6)
-	else:
-		_sky.rayleigh_color = Color(0.26, 0.41, 0.58)
+		ray_col = ray_col.lerp(Color(0.5, 0.35, 0.5), 1.0 - h / 0.6)
+	_sky_mat.set_shader_parameter("rayleigh_color", ray_col)
 
-	_sky.ground_color = Color(0.15, 0.12, 0.06).lerp(
+	var gc := Color(0.15, 0.12, 0.06).lerp(
 		Color(0.02, 0.02, 0.04), smoothstep(0.0, -0.2, elev))
+	_sky_mat.set_shader_parameter("ground_color", gc)
 
 	# ── Fog ─────────────────────────────────────────────────────────
 	var day_fog := Color(0.7, 0.75, 0.85)
-	var warm_fog := Color(0.85, 0.6, 0.4)
 	var night_fog := Color(0.06, 0.08, 0.14)
+	if _weather and _weather.current_state:
+		var ws: WeatherState
+		if _weather.blend >= 1.0:
+			ws = _weather.target_state
+		else:
+			ws = _weather.target_state  # WeatherManager already blends fog_density
+		day_fog = ws.fog_color_day
+		night_fog = ws.fog_color_night
+	var warm_fog := Color(0.85, 0.6, 0.4)
 
 	if above:
 		var fc := warm_fog.lerp(day_fog, h)
@@ -114,8 +138,7 @@ func _tick(t: float) -> void:
 		_env.volumetric_fog_emission_energy = 0.02
 
 	# ── Ambient & glow ──────────────────────────────────────────────
-	# Stars and moon provide a base ambient floor at night
-	_env.ambient_light_energy = lerpf(0.35, 0.8, smoothstep(-0.15, 0.2, elev))
+	_env.ambient_light_energy = lerpf(0.35, 0.8, smoothstep(-0.15, 0.2, elev)) * ambient_scale
 	if not above:
 		_env.ambient_light_color = Color(0.3, 0.35, 0.55)
 	else:

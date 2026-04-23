@@ -1,6 +1,8 @@
-extends CharacterBody3D
+extends "res://scripts/common/icombat_target.gd"
 ## Shared locomotion/body controller for Mixamo humanoids.
 ## Owns movement, navigation handoff, root motion, and locomotion tree updates.
+
+const FOOT_IK_SCRIPT := preload("res://scripts/player/foot_ik.gd")
 
 @export var move_speed: float = 3.5
 @export var rotation_speed: float = 10.0
@@ -14,6 +16,7 @@ extends CharacterBody3D
 @export var anim_tree_path: NodePath = ^"ybot_root/AnimationTree"
 @export var anim_player_path: NodePath = ^"ybot_root/AnimationPlayer"
 @export var nav_agent_path: NodePath = ^"NavigationAgent3D"
+@export var foot_ik_path: NodePath = ^"FootIK"
 
 @export var look_duration: float = 2.0
 @export var look_speed: float = 3.0
@@ -22,6 +25,7 @@ var visual_root: Node3D
 var anim_tree: AnimationTree
 var nav_agent: NavigationAgent3D
 var anim_player: AnimationPlayer
+var foot_ik: Node
 
 var _was_moving := false
 var _current_loco_blend: float = 0.0
@@ -38,6 +42,7 @@ var _look_timer: float = 0.0
 func _ready() -> void:
 	set_process(false)
 	_resolve_nodes()
+	_ensure_foot_ik_node()
 	if anim_tree:
 		anim_tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_PHYSICS
 		anim_tree.active = true
@@ -55,11 +60,14 @@ func _physics_process(delta: float) -> void:
 	move_speed = move_toward(move_speed, _target_speed, speed_lerp_rate * delta)
 	_before_move(delta)
 	if _action_locked:
+		if anim_player:
+			anim_player.speed_scale = _get_action_playback_scale()
 		var locked_motion := _get_action_root_motion_velocity(delta)
 		velocity.x = locked_motion.x
 		velocity.z = locked_motion.z
 		_process_idle_look(false, delta)
 		move_and_slide()
+		_update_foot_ik(delta)
 		return
 
 	var is_moving := false
@@ -85,11 +93,13 @@ func _physics_process(delta: float) -> void:
 			move_and_slide()
 	else:
 		move_and_slide()
+	_update_foot_ik(delta)
 
 
 func freeze(duration: float) -> void:
 	_frozen = true
 	_freeze_remaining = duration
+	_clear_foot_ik_overrides()
 	set_physics_process(false)
 	set_process(true)
 	_set_anim_condition("is_moving", false)
@@ -131,6 +141,11 @@ func look_toward(world_pos: Vector3) -> void:
 	_look_timer = look_duration
 
 
+func clear_look_toward() -> void:
+	_look_target = Vector3.INF
+	_look_timer = 0.0
+
+
 func set_alert_level(level: int) -> void:
 	_current_alert = level
 
@@ -162,6 +177,10 @@ func is_navigation_finished() -> bool:
 
 func is_moving_now() -> bool:
 	return Vector2(velocity.x, velocity.z).length() > 0.05
+
+
+func _get_action_playback_scale() -> float:
+	return 1.0
 
 
 func _on_controller_ready() -> void:
@@ -313,3 +332,33 @@ func _resolve_node(path: NodePath, fallback_name: String) -> Node:
 			if found:
 				return found
 	return find_child(fallback_name, true, false)
+
+
+func _ensure_foot_ik_node() -> void:
+	foot_ik = get_node_or_null(foot_ik_path)
+	if foot_ik:
+		return
+	var ik := Node.new()
+	ik.name = "FootIK"
+	ik.set_script(FOOT_IK_SCRIPT)
+	ik.set("skeleton_path", _get_foot_ik_skeleton_path())
+	add_child(ik)
+	foot_ik = ik
+
+
+func _get_foot_ik_skeleton_path() -> NodePath:
+	if not visual_root_path.is_empty():
+		return NodePath("%s/Armature/Skeleton3D" % str(visual_root_path))
+	if visual_root:
+		return NodePath("%s/Armature/Skeleton3D" % visual_root.name)
+	return ^"Armature/Skeleton3D"
+
+
+func _update_foot_ik(delta: float) -> void:
+	if foot_ik and foot_ik.has_method("update"):
+		foot_ik.update(delta)
+
+
+func _clear_foot_ik_overrides() -> void:
+	if foot_ik and foot_ik.has_method("clear_overrides"):
+		foot_ik.clear_overrides()

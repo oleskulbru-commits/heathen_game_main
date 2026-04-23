@@ -15,38 +15,31 @@
 [ext_resource type="Script" uid="uid://bj4rrip11tc6i" path="res://scripts/game/day_night_cycle.gd" id="7_daynight"]
 [ext_resource type="Texture2D" uid="uid://c1ujnkbh3m8hh" path="res://assets/enviroment_textures/Grass_Wild_pjvuH0_2K_surface_ms/pjvuH_2K_Albedo.jpg" id="7_dgi5k"]
 [ext_resource type="Texture2D" uid="uid://ca0egxj2cyyqe" path="res://assets/enviroment_textures/Ground_Forest_xeunbh1_2K_surface_ms/xeunbh1_2K_Albedo.jpg" id="7_fv21b"]
+[ext_resource type="Script" uid="uid://hntclqkdw8ga" path="res://scripts/game/weather_state.gd" id="7_vchkt"]
 [ext_resource type="Texture2D" uid="uid://4rhhwj3wgcg0" path="res://assets/enviroment_textures/Grass_Wild_pjvuH0_2K_surface_ms/pjvuH_2K_Normal.jpg" id="8_j8jky"]
 [ext_resource type="PackedScene" uid="uid://b742ktmlp1hjo" path="res://scenes/levels/ocean.tscn" id="8_ocean"]
 [ext_resource type="Texture2D" uid="uid://cd11cy0oxcpam" path="res://assets/enviroment_textures/Ground_Forest_xeunbh1_2K_surface_ms/xeunbh1_2K_Normal.jpg" id="8_tel4y"]
-[ext_resource type="PackedScene" path="res://assets/level/placeholders/dock.tscn" id="8_tipki"]
-[ext_resource type="PackedScene" path="res://assets/level/placeholders/cottage.tscn" id="9_85g3d"]
 [ext_resource type="Texture2D" uid="uid://c4fqptx6wge27" path="res://assets/enviroment_textures/Grass_Wild_pjvuH0_2K_surface_ms/pjvuH_2K_Roughness.jpg" id="9_kmb1v"]
 [ext_resource type="Texture2D" uid="uid://cpheacxcwqsrx" path="res://assets/enviroment_textures/Ground_Forest_xeunbh1_2K_surface_ms/xeunbh1_2K_Roughness.jpg" id="9_qkpxi"]
-[ext_resource type="PackedScene" path="res://assets/level/placeholders/log.tscn" id="10_choun"]
-[ext_resource type="PackedScene" path="res://assets/level/placeholders/cart.tscn" id="11_ya4ey"]
-[ext_resource type="PackedScene" path="res://assets/level/placeholders/barrel.tscn" id="12_trceg"]
 [ext_resource type="Texture2D" uid="uid://c5l074cdof2jl" path="res://assets/enviroment_textures/Snow_Pure_uewpai2fw_2K_surface_ms/uewpai2fw_2K_Albedo.jpg" id="13_5q0nq"]
-[ext_resource type="PackedScene" path="res://assets/level/placeholders/crate.tscn" id="13_a8y0u"]
-[ext_resource type="PackedScene" path="res://assets/level/placeholders/field_overgrown.tscn" id="14_a8y0u"]
 [ext_resource type="Texture2D" uid="uid://ciwvoa4nvnx2t" path="res://assets/enviroment_textures/Snow_Pure_uewpai2fw_2K_surface_ms/uewpai2fw_2K_Normal.jpg" id="14_dgi5k"]
 [ext_resource type="Texture2D" uid="uid://iddgtmc8nyx6" path="res://assets/enviroment_textures/Snow_Pure_uewpai2fw_2K_surface_ms/uewpai2fw_2K_Roughness.jpg" id="15_j8jky"]
-[ext_resource type="PackedScene" path="res://assets/level/placeholders/longhouse.tscn" id="15_jkv2x"]
-[ext_resource type="PackedScene" path="res://assets/level/placeholders/smithy.tscn" id="17_muem4"]
-[ext_resource type="PackedScene" uid="uid://boh3dpq3gx06x" path="res://assets/level/placeholders/standing_torch.tscn" id="18_torch"]
 [ext_resource type="PackedScene" uid="uid://43snob725tfs" path="res://scenes/ui/hud.tscn" id="19_hud"]
 [ext_resource type="Script" uid="uid://brh8x1wnycrl5" path="res://demo/src/RuntimeNavigationBaker.gd" id="20_navbaker"]
+[ext_resource type="PackedScene" path="res://assets/level/placeholders/barn.tscn" id="33_5q0nq"]
+[ext_resource type="PackedScene" path="res://assets/level/placeholders/boat.tscn" id="34_dgi5k"]
 [ext_resource type="PackedScene" uid="uid://dfpatff4d5okj" path="res://addons/godot_3d_cursor/scenes/3d_cursor.tscn" id="34_j8jky"]
-[ext_resource type="PackedScene" path="res://scenes/npcs/villagers/villager_male.tscn" id="37_pibwh"]
-[ext_resource type="PackedScene" path="res://scenes/npcs/villagers/villager_female.tscn" id="38_c6pm6"]
-[ext_resource type="Script" path="res://scripts/enemies/squad_manager.gd" id="39_squad"]
+[ext_resource type="Shader" uid="uid://ci3ea5u2ohb7l" path="res://assets/shaders/sky_clouds.gdshader" id="40_skyshd"]
+[ext_resource type="Script" uid="uid://cisnw8j6itaan" path="res://scripts/game/weather_manager.gd" id="41_weather"]
+[ext_resource type="Resource" path="res://assets/weather/overcast.tres" id="42_overcast"]
+[ext_resource type="Resource" path="res://assets/weather/fog.tres" id="43_fog"]
+[ext_resource type="Resource" path="res://assets/weather/rain.tres" id="44_rain"]
 
-[sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_env01"]
-rayleigh_color = Color(0.26, 0.41, 0.58, 1)
-mie_coefficient = 0.003
-mie_color = Color(0.69, 0.73, 0.73, 1)
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky01"]
+shader = ExtResource("40_skyshd")
 
 [sub_resource type="Sky" id="Sky_env01"]
-sky_material = SubResource("PhysicalSkyMaterial_env01")
+sky_material = SubResource("ShaderMaterial_sky01")
 process_mode = 1
 radiance_size = 5
 
@@ -240,7 +233,13 @@ camera_attributes = SubResource("CameraAttributes_env01")
 
 [node name="DayNightCycle" type="Node" parent="Lighting" unique_id=1082741242]
 script = ExtResource("7_daynight")
-time_of_day = 22.0
+time_of_day = 10.0
+
+[node name="WeatherManager" type="Node" parent="Lighting" unique_id=1906922954]
+script = ExtResource("41_weather")
+default_state = ExtResource("42_overcast")
+states = Array[ExtResource("7_vchkt")]([ExtResource("42_overcast"), ExtResource("43_fog"), ExtResource("44_rain")])
+auto_cycle = true
 
 [node name="VoxelGI" type="VoxelGI" parent="Lighting" unique_id=890869004]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6643, 5, 9018)
@@ -253,103 +252,30 @@ size = Vector3(80, 20, 60)
 data_directory = "res://assets/level"
 material = SubResource("Terrain3DMaterial_o6xl0")
 assets = SubResource("Terrain3DAssets_choun")
-vertex_spacing = 2.0
+vertex_spacing = 1.5
 top_level = true
 script = ExtResource("3_sugp2")
 height_file_name = "C:/Users/olema/OneDrive/projects/2026/Heathen_Prototype/assets/heightmaps/rogaland_10K0000.exr"
 import_position = Vector2i(-5120, -5120)
-import_scale = 0.4
+import_scale = 0.3
 metadata/_edit_lock_ = true
 
 [node name="Ocean" parent="World" unique_id=990331587 instance=ExtResource("8_ocean")]
-visible = false
-
-[node name="WaterMesh" parent="World/Ocean" index="0" unique_id=1120050994]
-visible = false
 
 [node name="PathSegment" parent="World" unique_id=14686769 instance=ExtResource("6_jbj1t")]
 transform = Transform3D(0.2043423, 0, 0.9788995, -0.10327433, 0.9944193, 0.021558205, -0.97343653, -0.105500445, 0.20320193, 6667.887, 2.509265, 9010.519)
 
+[node name="Player" parent="World" unique_id=731287834 instance=ExtResource("2_0wfyh")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3426.2012, 1.1799595, 5230.3477)
+
 [node name="Levels" type="Node3D" parent="." unique_id=1684067333]
-
-[node name="Settlements" type="Node3D" parent="Levels" unique_id=2077427986]
-
-[node name="Frafjord" type="Node3D" parent="Levels/Settlements" unique_id=901085818]
-transform = Transform3D(0.67575747, 0, -0.73712397, 0, 1, 0, 0.73712397, 0, 0.67575747, 6604.8613, 0, 9005.524)
-
-[node name="Dock" parent="Levels/Settlements/Frafjord" unique_id=964452339 instance=ExtResource("8_tipki")]
-transform = Transform3D(0.8889693, 0, 0.45796698, 0, 1, 0, -0.45796698, 0, 0.8889693, 41.222656, 0.011640549, -49.45117)
-
-[node name="Dock2" parent="Levels/Settlements/Frafjord" unique_id=1855277452 instance=ExtResource("8_tipki")]
-transform = Transform3D(0.8889693, 0, 0.45796698, 0, 1, 0, -0.45796698, 0, 0.8889693, 40.385742, 0.007929325, -51.105957)
-
-[node name="Cottage" parent="Levels/Settlements/Frafjord" unique_id=1229027032 instance=ExtResource("9_85g3d")]
-transform = Transform3D(-0.5780143, 0, 0.81602675, 0, 1, 0, -0.81602675, 0, -0.5780143, 42.70215, 2.4042287, -37.146484)
-
-[node name="Bandit" parent="Levels/Settlements/Frafjord" unique_id=1145995685 instance=ExtResource("4_jyhfs")]
-transform = Transform3D(0.6757575, 0, 0.737124, 0, 1, 0, -0.737124, 0, 0.6757575, 30.830078, 1.965761, 7.0166016)
-
-[node name="SquadManager" type="Node" parent="Levels/Settlements/Frafjord"]
-script = ExtResource("39_squad")
-
-[node name="Torches" type="Node3D" parent="Levels/Settlements/Frafjord" unique_id=1355762678]
-transform = Transform3D(0.6757575, 0, 0.737124, 0, 1, 0, -0.737124, 0, 0.6757575, -11101.473, 0, -1216.9487)
-
-[node name="Torch_Longhouse1" parent="Levels/Settlements/Frafjord/Torches" unique_id=1515845372 instance=ExtResource("18_torch")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6620, 1.8224587, 9030.437)
-
-[node name="Torch_Longhouse2" parent="Levels/Settlements/Frafjord/Torches" unique_id=1167862458 instance=ExtResource("18_torch")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6625, 2.918414, 9045.24)
-
-[node name="Torch_Cottage" parent="Levels/Settlements/Frafjord/Torches" unique_id=1157240775 instance=ExtResource("18_torch")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6645.8286, 2.99644, 9031.756)
-
-[node name="Torch_Smithy" parent="Levels/Settlements/Frafjord/Torches" unique_id=261656920 instance=ExtResource("18_torch")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6628, 1.7, 9006.541)
-
-[node name="Torch_Dock" parent="Levels/Settlements/Frafjord/Torches" unique_id=2030807977 instance=ExtResource("18_torch")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6667, 0.3, 9005)
-
-[node name="Torch_Supplies" parent="Levels/Settlements/Frafjord/Torches" unique_id=1396133404 instance=ExtResource("18_torch")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6664, 2.7, 9015)
-
-[node name="Torch_Path" parent="Levels/Settlements/Frafjord/Torches" unique_id=1732903219 instance=ExtResource("18_torch")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6645, 2.634994, 9018)
-
-[node name="Torch_Mid" parent="Levels/Settlements/Frafjord/Torches" unique_id=1895026066 instance=ExtResource("18_torch")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6638, 2, 9012)
-
-[node name="Log" parent="Levels/Settlements/Frafjord" unique_id=375041679 instance=ExtResource("10_choun")]
-transform = Transform3D(0.9872921, 0, 0.1589163, 0, 1, 0, -0.1589163, 0, 0.9872921, 45.935547, 2.6504045, -33.784668)
-
-[node name="Cart" parent="Levels/Settlements/Frafjord" unique_id=459797182 instance=ExtResource("11_ya4ey")]
-transform = Transform3D(0.91199136, 0, 0.4102096, 0, 1, 0, -0.4102096, 0, 0.91199136, 47.118164, 2.5707424, -32.822266)
-
-[node name="Barrel" parent="Levels/Settlements/Frafjord" unique_id=37508885 instance=ExtResource("12_trceg")]
-transform = Transform3D(0.6757575, 0, 0.737124, 0, 1, 0, -0.737124, 0, 0.6757575, 45.753906, 2.7181456, -36.39795)
-
-[node name="Crate" parent="Levels/Settlements/Frafjord" unique_id=1438554472 instance=ExtResource("13_a8y0u")]
-transform = Transform3D(0.6757575, 0, 0.737124, 0, 1, 0, -0.737124, 0, 0.6757575, 45.566406, 2.7245483, -37.111816)
-
-[node name="FieldOvergrown" parent="Levels/Settlements/Frafjord" unique_id=1902961378 instance=ExtResource("14_a8y0u")]
-transform = Transform3D(1.6221926, 0, 1.1439916, 0, 1.9849998, 0, -1.1439916, 0, 1.6221926, 33.916992, 2.5643616, -24.618652)
-
-[node name="Longhouse" parent="Levels/Settlements/Frafjord" unique_id=630378881 instance=ExtResource("15_jkv2x")]
-transform = Transform3D(0.6757575, 0, 0.737124, 0, 1, 0, -0.737124, 0, 0.6757575, 34.878906, 2.1052241, 7.998535)
-
-[node name="Smithy" parent="Levels/Settlements/Frafjord" unique_id=1867471841 instance=ExtResource("17_muem4")]
-transform = Transform3D(0.94489753, 0, 0.3273663, 0, 1, 0, -0.3273663, 0, 0.94489753, 12.462891, 1.6637712, -19.01416)
 
 [node name="Characters" type="Node3D" parent="." unique_id=592048963]
 
-[node name="Player" parent="Characters" unique_id=731287834 instance=ExtResource("2_0wfyh")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6634.79, 2.851027, 9039.433)
-
-[node name="RuntimeNavigationBaker" type="Node" parent="." unique_id=589365160 node_paths=PackedStringArray("terrain", "player")]
+[node name="RuntimeNavigationBaker" type="Node" parent="." unique_id=589365160 node_paths=PackedStringArray("terrain")]
 script = ExtResource("20_navbaker")
 template = SubResource("NavigationMesh_bandit")
 terrain = NodePath("../World/Terrain3D")
-player = NodePath("../Characters/Player")
 log_timing = true
 
 [node name="3DCursor" parent="." unique_id=1168684601 instance=ExtResource("34_j8jky")]
@@ -360,10 +286,16 @@ metadata/show_number_label = true
 metadata/scale_affect_labels = true
 metadata/_edit_lock_ = true
 
-[node name="VillagerMale" parent="." unique_id=348096769 instance=ExtResource("37_pibwh")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6657.0366, 2.5973878, 9020.463)
+[node name="Bandit" parent="." unique_id=1182602049 instance=ExtResource("4_jyhfs")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3406.898, 1.2423368, 5211.893)
 
-[node name="VillagerFemale" parent="." unique_id=1273189951 instance=ExtResource("38_c6pm6")]
-transform = Transform3D(-0.96649265, 0, 0.2566943, 0, 1, 0, -0.2566943, 0, -0.96649265, 6659.17, 2.6341982, 9014.993)
+[node name="Bandit2" parent="." unique_id=1043643571 instance=ExtResource("4_jyhfs")]
+transform = Transform3D(0.7876668, 0, -0.6161015, 0, 1, 0, 0.6161015, 0, 0.7876668, 3400.821, 1.1971184, 5209.658)
+
+[node name="Barn" parent="." unique_id=972866010 instance=ExtResource("33_5q0nq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3404.2996, 1.1578319, 5215.222)
+
+[node name="Boat" parent="." unique_id=287213633 instance=ExtResource("34_dgi5k")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3317.343, 0, 5200.441)
 
 [editable path="World/Ocean"]

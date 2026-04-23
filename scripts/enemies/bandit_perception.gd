@@ -54,7 +54,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if not _player_ref or not _bandit or not _brain:
 		return
-	if _player_ref.has_method("is_dead") and bool(_player_ref.is_dead()):
+	if _player_ref is ICombatTarget and bool(_player_ref.is_dead()):
 		_sight_rate = 0.0
 		_suspicion_input = 0.0
 		_brain.set_visual_contact(false)
